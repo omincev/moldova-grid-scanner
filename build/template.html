@@ -159,6 +159,21 @@ svg text{font-family:var(--f-body)}
 .filters button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
 .filters button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tag.lb{background:var(--warn)}
+.realised{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px}
+.realised .panel{padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.rstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rstat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.rstat .v{font-family:var(--f-display);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.rstat .l{font-size:12px;color:var(--muted)}
+.rctl{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.rctl label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.rctl select{font-family:var(--f-mono);font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.rctl select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.live{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.live.on i{background:var(--ok)}
+.chartwrap svg{width:100%;height:auto;display:block}
+@media (max-width:900px){.realised{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:900px){.scanner,.calc,.shape{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:560px){.rank th:nth-child(4),.rank td:nth-child(4){display:none}}
 @media (max-width:480px){.fields{grid-template-columns:minmax(0,1fr)}.wrow{grid-template-columns:minmax(0,1fr) 90px 32px}.kpi .v{font-size:22px}}
@@ -173,7 +188,7 @@ svg text{font-family:var(--f-body)}
   <div class="chips">
     <span class="chip">Snapshot <b>12 Nov 2026</b></span>
     <span class="chip">Permit register <b>Moldelectrica, 14 Aug 2026</b></span>
-    <span class="chip">Hourly prices <b>not loaded</b></span>
+    <span class="chip">Romanian day-ahead prices <b id="chipLatest">to 12 Nov 2026</b></span>
     <span class="chip">Hosting-capacity map <b>none published</b></span>
   </div>
 </header>
@@ -192,10 +207,33 @@ svg text{font-family:var(--f-body)}
 
 <section>
   <div class="sec-head"><span class="eyebrow">Feature F1 · price spread (system level)</span><h2>Where the battery margin comes from</h2>
-  <p class="lede">Moldova buys a large share of its power on the Romanian day-ahead market, so the daily price shape follows Romania's. The bars show the price ranges reported for each season. They are reported ranges, not hourly data this page computed.</p></div>
+  <p class="lede">Moldova buys a large share of its power on the Romanian day-ahead market, so the daily price shape follows Romania's. The bars show the price ranges reported for each season. They are reported ranges. The section below has actual daily prices, and this autumn they ran well above these ranges.</p></div>
   <div class="shape">
     <div class="panel"><h3>Spring and summer</h3><svg id="shapeSummer" viewBox="0 0 420 170" role="img" aria-label="Spring and summer price ranges: midday 0 to 25 euro per MWh, peak 100 to 200"></svg><span class="label-note">Midday (10:00–17:00 CET) 0–25 €/MWh, negative at times; peak 100–200 €/MWh. Source: <a href="#src-watchdog">WatchDog.MD</a>, p.17.</span></div>
     <div class="panel"><h3>Autumn and winter</h3><svg id="shapeWinter" viewBox="0 0 420 170" role="img" aria-label="Autumn and winter price ranges: off-peak about 100 euro per MWh, peak 150 to 200"></svg><span class="label-note">Off-peak ~100 €/MWh; peak 150–200 €/MWh. Source: <a href="#src-watchdog">WatchDog.MD</a>, p.17.</span></div>
+  </div>
+</section>
+
+<section id="realised">
+  <div class="sec-head"><span class="eyebrow">Feature F1 · realised spread · updated daily</span><h2>What a battery would have earned, day by day</h2>
+  <p class="lede">These are actual 15-minute day-ahead prices for Romania, the market Moldova imports from, as published by Energy-Charts. Each day the page finds the cheapest charging window and the most expensive discharging window that comes after it, as one full cycle with perfect foresight. That is an upper bound on what arbitrage could earn. Moldova's own market (OPEM) is not coupled, and its prices are not loaded yet.</p>
+  <span class="live" id="liveState"><i></i><span id="liveText">Stored history</span></span></div>
+  <div class="realised">
+    <div class="panel">
+      <div class="rctl">
+        <label for="rDur">Battery duration<select id="rDur"><option value="1">1 h</option><option value="2" selected>2 h</option><option value="4">4 h</option></select></label>
+        <label for="rWin">Window<select id="rWin"><option value="7">last 7 days</option><option value="30" selected>last 30 days</option><option value="9999">all stored</option></select></label>
+      </div>
+      <div class="rstats" id="rStats"></div>
+      <p class="label-note" id="rNote"></p>
+    </div>
+    <div class="panel">
+      <h3>Daily arbitrage margin, € per MW</h3>
+      <div class="chartwrap"><svg id="rBars" viewBox="0 0 560 200" role="img" aria-label="Daily arbitrage margin per MW"></svg></div>
+      <h3 id="rDayTitle">Latest day</h3>
+      <div class="chartwrap"><svg id="rDay" viewBox="0 0 560 200" role="img" aria-label="15-minute prices of the latest day with charge and discharge windows"></svg></div>
+      <div class="legend"><span><span class="sw" style="background:var(--wind)"></span>charge window</span><span><span class="sw" style="background:var(--warn)"></span>discharge window</span><span>Click a bar to show that day</span></div>
+    </div>
   </div>
 </section>
 
@@ -243,28 +281,28 @@ svg text{font-family:var(--f-body)}
     <div class="panel cand">
       <span class="lbl ok">Grid-scale BESS · first mover</span>
       <h3>Vulcănești 400 kV node</h3>
-      <dl><dt>Grid</dt><dd>400 kV to Isaccea (RO) and to Chișinău (since 8 Nov 2026)</dd><dt>Works</dt><dd>400 kV extension ~94% (30 Jun 2026)</dd><dt>Queue nearby</dt><dd>0 MW in Cahul, Vulcănești, Comrat, Taraclia</dd></dl>
-      <ul><li>The strongest point in the south now that it has two 400 kV links, and nobody has a permit near it.</li><li>Suits a balancing battery (aFRR/mFRR) rather than one tied to a wind farm.</li><li>Not known: whether there is a 110 kV or MV level to connect to, and how much capacity is free.</li></ul>
-      <p class="next"><b>Next step:</b> ask Moldelectrica for connection options and capacity at Vulcănești, and the terms of a flexible permit.</p>
+      <dl><dt>Substation</dt><dd>400/110/35/10 kV; 250 MVA autotransformer from 1972, replacement 2028</dd><dt>Grid</dt><dd>400 kV to Isaccea (RO), MGRES and, since 8 Nov 2026, Chișinău</dd><dt>Works</dt><dd>400 kV extension 2026; 150 MVAr reactor 2027</dd><dt>Queue nearby</dt><dd>0 MW in Cahul, Vulcănești, Comrat, Taraclia; the plan's scenarios have 180 MW of wind at Vulcănești by 2033</dd></dl>
+      <ul><li>It has a 110 kV level, so a battery can connect there.</li><li>The development plan calls overloads on the 400 kV Vulcănești–Isaccea and 110 kV Vulcănești–Bolgrad lines under N-1 its "most serious problem". A battery here could be offered as congestion relief, but expect operating limits.</li><li>The plan's fix (Vulcănești–Smârdan 400 kV plus Artsyz, or a phase-shifting transformer) is a candidate for financing after 2034.</li></ul>
+      <p class="next"><b>Next step:</b> ask Moldelectrica for 110 kV connection capacity at Vulcănești, whether a battery would count toward easing the Isaccea and Bolgrad overloads, and the terms of a flexible permit.</p>
     </div>
     <div class="panel cand">
       <span class="lbl risk">Co-located BESS · connection risk</span>
       <h3>Ștefan Vodă wind cluster</h3>
       <dl><dt>Permitted</dt><dd>328.9 MW, 18 permits</dd><dt>No storage</dt><dd>170.9 MW</dd><dt>Via MGRES lines</dt><dd>269.5 MW (82%)</dd><dt>Substations</dt><dd>Cioburciu, Caplani, Olănești, Purcari, Ștefan Vodă</dd></dl>
-      <ul><li>The largest renewable cluster in the country, and wind needs storage here.</li><li>Wind-auction winners Leafwind and Navitas hold permits here and must add at least 0.25 MWh per MW. They could be partners or competitors.</li><li>Most connections are taps on 110 kV lines from MGRES. If those lines can't carry power, a battery is stranded with them.</li></ul>
-      <p class="next"><b>Next step:</b> before any revenue case, get Moldelectrica's view on how secure the MGRES–Cioburciu, –Caplani and –Purcari lines are.</p>
+      <ul><li>The largest renewable cluster in the country, and wind needs storage here.</li><li>Wind-auction winners Leafwind and Navitas hold permits here and must add at least 0.25 MWh per MW. They could be partners or competitors.</li><li>Most connections are taps on 110 kV lines from MGRES. If those lines can't carry power, a battery is stranded with them.</li><li>The development plan proposes a new 400/330/110 kV substation near Ștefan Vodă to carry the south-east's renewables away. Its feasibility study is under way, with no date or cost yet. If built, it would remove the MGRES dependence. Răscăieții Noi–Ștefan Vodă 110 kV is to be rebuilt in 2028, and Răscăieții Noi–MGRES in 2030.</li></ul>
+      <p class="next"><b>Next step:</b> before any revenue case, get Moldelectrica's view on how secure the MGRES–Cioburciu, –Caplani and –Purcari lines are, and on the timing of the Ștefan Vodă 400 kV substation. A battery could be timed to it.</p>
     </div>
     <div class="panel cand">
       <span class="lbl ok">Co-located BESS · cleaner grid path</span>
       <h3>Cimișlia and western Căușeni</h3>
       <dl><dt>Cimișlia</dt><dd>52.3 MW, 50 MW wind without storage, 0 via Transnistrian-region lines</dd><dt>Căușeni</dt><dd>146 MW wind, 0 storage; 76 MW via Vărnița–Bender, 70 MW via Taraclia Nord–Basarabeasca</dd></dl>
-      <ul><li>Gura Galbenei (50 MW, on the Chișinău–Gura Galbenei 110 kV line) and Taraclia (70 MW, Taraclia Nord–Basarabeasca) connect entirely on the right bank.</li><li>About 120 MW of wind with no storage and a clean path makes this the best co-location target.</li><li>The permits date from 2023 and have been extended to 2027–2028. Check whether the projects are still alive.</li></ul>
+      <ul><li>Gura Galbenei (50 MW, on the Chișinău–Gura Galbenei 110 kV line) and Taraclia (70 MW, Taraclia Nord–Basarabeasca) connect entirely on the right bank.</li><li>About 120 MW of wind with no storage and a clean path makes this the best co-location target.</li><li>The permits date from 2023 and have been extended to 2027–2028. Check whether the projects are still alive.</li><li>Taraclia Nord 110/35/10 kV has one 10 MVA transformer. 14.87 MW waiting at its 35/10 kV level cannot connect, and a second transformer comes only after 2034. The 70 MW Taraclia permit connects at 110 kV, so it is not blocked by this.</li></ul>
       <p class="next"><b>Next step:</b> approach the GS Blue Energy (Gura Galbenei) and HPI Wind Alpha (Taraclia) projects about adding storage.</p>
     </div>
   </div>
   <div class="panel verdict">
     <h3>Feasibility in one paragraph</h3>
-    <p>The need is real. The south holds 368 MW of wind and solar with no storage, the system has an evening deficit of over 600 MW, and the Energy Community's study sizes 162 MW of upward reserve for about 1,261 MW of variable renewables. But arbitrage alone does not pay for a battery. At about €1M per MW for 2 hours (the study's capex), €38k–103k per MW per year of arbitrage means a simple payback of about 10–27 years. A southern battery works when it also earns balancing payments or is paid for by a wind project's storage obligation, and when it connects at Vulcănești or on a right-bank line. MGRES-dependent connections in Ștefan Vodă need clearing with Moldelectrica first.</p>
+    <p>The need is real. The south holds 368 MW of wind and solar with no storage, the system has an evening deficit of over 600 MW, and the Energy Community's study sizes 162 MW of upward reserve for about 1,261 MW of variable renewables. But arbitrage alone is a weak base for a battery. At about €1M per MW for 2 hours (the study's capex), the seasonal ranges give €38k–103k per MW per year, a simple payback of about 10–27 years. The realised Romanian prices above (Oct–Nov 2026) sit inside that range, but they cover one season, not a year. A southern battery works when it also earns balancing payments or is paid for by a wind project's storage obligation, and when it connects at Vulcănești or on a right-bank line. MGRES-dependent connections in Ștefan Vodă need clearing with Moldelectrica first.</p>
     <p class="label-note">Sources: permit register (14 Aug 2026); <a href="https://energie.gov.md/sites/default/files/document/attachments/deliverable_4-_res_and_bess_integration_report_final.pdf" target="_blank" rel="noopener">Tetra Tech for the Energy Community Secretariat, May 2025</a>; <a href="https://energie.gov.md/sites/default/files/stadiul_proiectelorprogramelor_de_infrastructura_ale_men_-actualizare_14.07.2026.pdf" target="_blank" rel="noopener">Ministry of Energy project status, 14 Jul 2026</a>; <a href="https://www.old.ipn.md/en/cuciurgan-power-plant-stops-delivering-energy-to-the-right-bank-7966_1110346.html" target="_blank" rel="noopener">IPN on MGRES supply</a>.</p>
   </div>
 </section>
@@ -311,7 +349,7 @@ svg text{font-family:var(--f-body)}
   <div class="gaps">
     <div class="panel gap"><b>Distribution permits are missing</b><span>The register covers permits issued by Moldelectrica only. Premier Energy Distribution had issued 329 MW and RED Nord 96.4 MW (Jul 2025), with no breakdown by location. <a href="#src-gov">Ministry of Energy</a></span></div>
     <div class="panel gap"><b>A permit is not a project</b><span>Moldelectrica had issued about 1,500 MW of permits by Feb 2025, and under 10% get built each year. Read high scores as pressure, not certainty. <a href="#src-gov">Ministry of Energy</a></span></div>
-    <div class="panel gap"><b>No hourly prices</b><span>OPEM's results pages could not be reached from here, so price spread is the reported seasonal range, not a backtest. The next step is to ingest OPEM or ENTSO-E MD prices.</span></div>
+    <div class="panel gap"><b>Romanian prices, not Moldovan</b><span>The daily spread uses Romanian day-ahead prices, the market Moldova imports from. OPEM's Moldovan prices could not be reached from here. Energy-Charts' data is for private and internal use only.</span></div>
     <div class="panel gap"><b>No hosting capacity by node</b><span>Unlike Denmark, there is no public free/limited/no-capacity map. Closeness to the backbone is a stand-in for grid strength, measured in straight-line km from the district seat.</span></div>
     <div class="panel gap"><b>The Transnistrian flag is a text rule</b><span>A permit is flagged when its connection point names MGRES, CERS Moldovenească, Bender or Rîbnița. It does not say whether the line works today. Only Moldelectrica can say that.</span></div>
     <div class="panel gap"><b>Positions are approximate</b><span>Each district is drawn at its seat town. Nodes in the Transnistrian region (MGRES, Rîbnița) are shown but left out of the closeness score.</span></div>
@@ -331,6 +369,8 @@ svg text{font-family:var(--f-body)}
     <li id="src-ies"><a href="https://ies.lublin.pl/en/comments/the-price-of-security-moldovas-electricity-market-in-2025/" target="_blank" rel="noopener">IEŚ, The price of security: Moldova's electricity market in 2025</a>: interconnector timeline</li>
     <li id="src-gov"><a href="https://energie.gov.md/ro/content/30-de-avize-de-racordare-la-retea-cu-o-capacitate-totala-de-peste-109-mw-au-fost-returnate" target="_blank" rel="noopener">Ministry of Energy, returned connection permits (Jul 2025)</a></li>
     <li id="src-infomarket"><a href="https://www.infomarket.md/en/news/the-region-s-energy-shortage-has-reached-moldova-batteries-will-solve-only-part-of-the-problem" target="_blank" rel="noopener">InfoMarket, regional shortage and batteries (Aug 2026)</a></li>
+    <li id="src-tyndp25"><a href="https://rdp.moldelectrica.md/files/docs/TYNDP%202025-2034%20(RO).pdf" target="_blank" rel="noopener">Moldelectrica, Transmission Network Development Plan 2025–2034</a>: southern substations, overloads, reinforcements (pp. 33, 77–78, 141–198)</li>
+    <li id="src-ec"><a href="https://api.energy-charts.info/" target="_blank" rel="noopener">Energy-Charts (Fraunhofer ISE), Romanian day-ahead prices, 15 min</a>: realised spread; private and internal use only</li>
     <li id="src-tyndp"><a href="https://moldelectrica.md/files/docs/TYNDP_EN.pdf" target="_blank" rel="noopener">Moldelectrica, Transmission Network Development Plan 2018–2027</a>: substation voltages</li>
   </ol></div>
   <p class="foot">This is not investment advice. Outline: Natural Earth via world-atlas. Scores are relative across districts and change with the weights.</p>
@@ -339,6 +379,7 @@ svg text{font-family:var(--f-body)}
 
 <script>
 const DATA = __DATA__;
+const RO_BASE = __RO__;
 const $ = s => document.querySelector(s);
 const fmt = (n,d=0) => n.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d});
 const TODAY = '2026-11-12';
@@ -464,6 +505,70 @@ function refresh(){ ['1','2','3'].forEach(i=>$('#o'+i).textContent=$('#w'+i).val
 $('#fAll').addEventListener('click',()=>setFilter(false)); $('#fSouth').addEventListener('click',()=>setFilter(true));
 refresh();
 
+/* ---- realised spread (Romanian day-ahead, 15 min) ---- */
+const RO = new Map(RO_BASE.map(x=>[x.date,{...x,src:'stored'}]));
+const tzDayStart = date => { // unix seconds of local midnight in Chișinău; DST-aware via Intl
+  const [y,m,d]=date.split('-').map(Number); let guess=Date.UTC(y,m-1,d)/1000-3*3600;
+  for(let k=0;k<3;k++){ const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Chisinau',hour:'2-digit',minute:'2-digit',year:'numeric',month:'2-digit',day:'2-digit',hourCycle:'h23'}).formatToParts(new Date(guess*1000));
+    const g=t=>+p.find(x=>x.type===t).value; const local=Date.UTC(g('year'),g('month')-1,g('day'),g('hour'),g('minute'))/1000; guess+= (Date.UTC(y,m-1,d)/1000-local); }
+  return guess; };
+const validDay = x => x && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && Array.isArray(x.p) && x.p.length>=92 && x.p.length<=100 && x.p.every(v=>typeof v==='number'&&isFinite(v)) && x.u===tzDayStart(x.date) && x.p.length===Math.round((tzDayStart(nextDate(x.date))-x.u)/900);
+function nextDate(d){ const t=new Date(d+'T12:00:00Z'); t.setUTCDate(t.getUTCDate()+1); return t.toISOString().slice(0,10); }
+function bestCycle(p,hours,rte){ const n=hours*4, ps=[0]; p.forEach(v=>ps.push(ps[ps.length-1]+v)); const avg=i=>(ps[i+n]-ps[i])/n;
+  let best={m:0,c:-1,d:-1}, minC=Infinity, minI=-1;
+  for(let j=n;j+n<=p.length;j++){ const a=avg(j-n); if(a<minC){minC=a;minI=j-n;} const m=hours*avg(j)-(hours/rte)*minC; if(m>best.m) best={m,c:minI,d:j}; }
+  return best; }
+let rSel=null;
+function rDays(){ return [...RO.values()].sort((a,b)=>a.date<b.date?-1:1); }
+function hhmm(q){ const h=Math.floor(q/4), m=(q%4)*15; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function renderRealised(){
+  const hours=+$('#rDur').value, rte=Math.min(1,Math.max(0.5,(parseFloat($('#rte').value)||85)/100)), win=+$('#rWin').value;
+  const all=rDays(); if(!all.length) return;
+  const days=all.slice(-win).map(x=>({...x,c:bestCycle(x.p,hours,rte)}));
+  const ms=days.map(d=>d.c.m), mean=ms.reduce((a,b)=>a+b,0)/ms.length, last=days[days.length-1];
+  const capex=parseFloat($('#capex').value), opex=parseFloat($('#opex').value)||0, annual=mean*365;
+  const pay = isFinite(capex)&&capex>0 && annual-opex>0 ? fmt(capex/(annual-opex),1)+' yrs' : 'n/a';
+  $('#chipLatest').textContent='to '+new Date(last.date+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  $('#rStats').innerHTML=`
+    <div class="rstat"><span class="l">Latest day (${last.date})</span><span class="v">€${fmt(last.c.m,0)}</span><span class="l">per MW, one cycle</span></div>
+    <div class="rstat"><span class="l">Average over ${days.length} days</span><span class="v">€${fmt(mean,0)}</span><span class="l">per MW per day</span></div>
+    <div class="rstat"><span class="l">If every day were like this</span><span class="v">€${fmt(annual/1000,0)}k</span><span class="l">per MW per year</span></div>
+    <div class="rstat"><span class="l">Simple payback at your capex</span><span class="v">${pay}</span><span class="l">capex and opex from the calculator below</span></div>`;
+  const spreads=days.map(d=>Math.max(...d.p)-Math.min(...d.p));
+  $('#rNote').textContent=`${hours} h battery, ${Math.round(rte*100)}% round trip. Daily max–min price gap averaged €${fmt(spreads.reduce((a,b)=>a+b,0)/spreads.length,0)}/MWh. One season scaled to a year is not a forecast: spring and summer middays add a solar trough that autumn lacks. Network tariffs, degradation and balancing revenue are not included.`;
+  // bars
+  const s=$('#rBars'); s.innerHTML=''; const W=560,H=200,L=44,B=24,T=10, max=Math.max(...ms,1)*1.1, bw=(W-L-8)/days.length;
+  const Y=v=>T+(H-T-B)*(1-v/max);
+  const step=max>800?400:max>400?200:100; const tick=[]; for(let v=0;v<=max;v+=step) tick.push(v);
+  tick.forEach(v=>{ el('line',{x1:L,x2:W-4,y1:Y(v),y2:Y(v),stroke:'var(--line)'},s); const t=el('text',{x:L-6,y:Y(v)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},s); t.textContent=fmt(v,0); });
+  const sel = rSel && days.find(d=>d.date===rSel) ? rSel : last.date;
+  days.forEach((d,i)=>{ const r=el('rect',{x:L+i*bw+1,y:Y(d.c.m),width:Math.max(1,bw-2),height:Math.max(0,Y(0)-Y(d.c.m)),rx:1.5,fill:d.date===sel?'var(--accent)':'var(--ramp1)',style:'cursor:pointer',tabindex:0,role:'button','aria-label':`${d.date}: €${fmt(d.c.m,0)} per MW`},s);
+    const tt=el('title',{},r); tt.textContent=`${d.date}: €${fmt(d.c.m,0)}/MW`;
+    r.addEventListener('click',()=>{rSel=d.date;renderRealised();}); r.addEventListener('keydown',e=>{if(e.key==='Enter'){rSel=d.date;renderRealised();}}); });
+  [0,days.length-1].forEach(i=>{ const t=el('text',{x:L+i*bw+bw/2,y:H-6,'text-anchor':i?'end':'start','font-size':11,fill:'var(--muted)'},s); t.textContent=days[i].date.slice(5); });
+  // day profile
+  const d=days.find(x=>x.date===sel), p=d.p, q=$('#rDay'); q.innerHTML='';
+  $('#rDayTitle').textContent = `15-minute prices, ${d.date} (€/MWh)` + (d.c.c>=0 ? ` · charge ${hhmm(d.c.c)}–${hhmm(d.c.c+hours*4)}, discharge ${hhmm(d.c.d)}–${hhmm(d.c.d+hours*4)}, €${fmt(d.c.m,0)}/MW` : '');
+  const pmin=Math.min(0,Math.floor(Math.min(...p)/50)*50), pmax=Math.ceil(Math.max(...p)/50)*50, X=i=>L+(W-L-8)*i/(p.length), Yp=v=>T+(H-T-B)*(1-(v-pmin)/(pmax-pmin));
+  if(d.c.c>=0){ const n=hours*4; el('rect',{x:X(d.c.c),y:T,width:X(d.c.c+n)-X(d.c.c),height:H-T-B,fill:'var(--wind)',opacity:.18},q); el('rect',{x:X(d.c.d),y:T,width:X(d.c.d+n)-X(d.c.d),height:H-T-B,fill:'var(--warn)',opacity:.2},q); }
+  [pmin,(pmin+pmax)/2,pmax].forEach(v=>{ el('line',{x1:L,x2:W-4,y1:Yp(v),y2:Yp(v),stroke:'var(--line)'},q); const t=el('text',{x:L-6,y:Yp(v)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},q); t.textContent=fmt(v,0); });
+  el('path',{d:p.map((v,i)=>(i?'L':'M')+X(i+0.5).toFixed(1)+' '+Yp(v).toFixed(1)).join(' '),fill:'none',stroke:'var(--ink)','stroke-width':1.6,'stroke-linejoin':'round'},q);
+  [0,24,48,72].forEach(i=>{ if(i<p.length){ const t=el('text',{x:X(i),y:H-6,'font-size':11,fill:'var(--muted)'},q); t.textContent=hhmm(i);} });
+}
+['#rDur','#rWin'].forEach(s=>$(s).addEventListener('change',()=>{rSel=null;renderRealised();}));
+['#rte','#capex','#opex'].forEach(s=>$(s).addEventListener('input',renderRealised));
+function setLive(on,text){ $('#liveState').classList.toggle('on',on); $('#liveText').textContent=text; }
+(async()=>{ let db=null; try{ db=await window.claude?.use?.('db'); }catch(e){ db=null; }
+  if(!db){ setLive(false,'Stored history only (live store not available in this view)'); return; }
+  const timer=setTimeout(()=>setLive(false,'Live store not reachable yet; showing stored history'),10000);
+  db.collection('ro_dam').orderBy('date','desc').limit(400).onSnapshot(snap=>{
+    if(!snap.metadata.fromCache) clearTimeout(timer);
+    let added=0; snap.docs.forEach(doc=>{ const b=doc.data(); const x=b&&{date:b.date,u:b.first_unix,p:b.prices,src:'live'}; if(validDay(x)){ RO.set(x.date,x); added++; } });
+    const latest=rDays().slice(-1)[0];
+    setLive(true,`Live · ${added} day${added===1?'':'s'} in the store · latest delivery day ${latest.date}`); renderRealised();
+  }, ()=>{ clearTimeout(timer); setLive(false,'Live store unavailable; showing stored history'); });
+})();
+
 /* ---- calculator ---- */
 const ids=['dur','rte','sLoLo','sHiLo','sLoHi','sHiHi','wLoLo','wHiLo','wLoHi','wHiHi','capex','opex'];
 const DAYS={s:182,w:183};
@@ -490,5 +595,5 @@ function calc(){
     </table>
     <p class="label-note">One cycle per day; each cycle buys ${E}/${(rte).toFixed(2)} MWh and sells ${E} MWh. Spring/summer is dominated by the solar midday trough; in winter, losses at about 100 €/MWh off-peak eat much of the spread. Moldova is tendering 246 MW of balancing capacity (72 MW aFRR, 174 MW mFRR) that storage can bid into, and that revenue would come on top (<a href="https://www.ess-news.com/2025/04/10/moldova-to-tender-246-mw-of-colocated-battery-storage/" target="_blank" rel="noopener">ESS News</a>).</p>`;
 }
-ids.forEach(i=>$('#'+i).addEventListener('input',calc)); calc();
+ids.forEach(i=>$('#'+i).addEventListener('input',calc)); calc(); renderRealised();
 </script>
