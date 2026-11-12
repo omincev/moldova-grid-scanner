@@ -2,7 +2,10 @@
 
 A grid-opportunity scan of Moldova from public data, built to assess whether battery storage (BESS) can work in southern Moldova. It works like the Danish grid scanner: every figure has a source, and missing data stays missing.
 
-- `site/index.html`: the scanner page, one self-contained file. Open it in a browser.
+- `site/index.html`: the scanner page, one self-contained file. Open it in a browser. It has three tabs:
+  - **Scanner** (`#scanner`): districts, southern BESS assessment, daily realised battery spread.
+  - **Equipment list** (`#equipment`): pick asset, site, MW, hours, voltage and connection method. It produces an equipment list with quantities, RFQ specifications and the rule behind each line (ANRE Decision 108/2024 connection requirements, IEC/UL battery safety), exportable as CSV. It is a preliminary scope for supplier quotes, not a final design.
+  - **Permits & licences** (`#permits`): the path under Electricity Law 164/2025, covering land, connection permit and guarantee, Government authorisation above 20 MW, environmental assessment, urban planning and building permit, ANRE storage licence, admission into operation, market registration, balancing qualification, and incentives. Each step gives the authority, what to bring, timing, legal basis and source, tailored to the project set in the Equipment tab. Not legal advice; two of the ANRE rules involved are drafts.
 - `data/ro_dam_prices.psv`: Romanian day-ahead prices, 15-minute, EUR/MWh, from Energy-Charts (Fraunhofer ISE, private and internal use only), as stored when the page was built. One row per local delivery day: date, unix time of local midnight, prices.
 - `data/moldelectrica_permits_2026-08-14.psv`: Moldelectrica's register of grid-connection permits, edition 14.08.2026, transcribed (78 permits, 1,175.9 MW, pipe-separated).
 - `build/`: rebuilds `site/index.html` from the register and `template.html` (`cd build && npm install && npm run build`).
