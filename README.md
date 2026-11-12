@@ -18,7 +18,7 @@ A grid-opportunity scan of Moldova from public data, built to assess whether bat
 
 ## Southern Moldova: BESS feasibility
 
-South here means Ștefan Vodă, Căușeni, Cimișlia, Leova and Ceadîr-Lunga, the southern raions with permits. Cahul, Vulcănești, Comrat, Taraclia, Basarabeasca and Cantemir have none.
+South here means Ștefan Vodă, Căușeni, Cimișlia and Leova, plus Gagauzia (UTA Găgăuzia), which the page treats as its own region with three districts: Comrat, Ceadîr-Lunga and Vulcănești. Each has its own substation: Vulcănești 400/110/35/10 kV (AT1 250 MVA, 1972, replaced 2028), Comrat 110/35/10 kV (T1 16 MVA, 1970, replaced by 2034; a 400 kV "Comratul Nou" option by 2033) and Ceadîr-Lunga 110/10 kV (2 × 16 MVA, 1981/1985). Only Ceadîr-Lunga has a permit (10 MW solar + storage). Cahul, Taraclia, Basarabeasca and Cantemir have none.
 
 | | |
 |---|---|

@@ -79,9 +79,25 @@ DATA.rows.forEach(r=>{
   if(!kinds.length && r.storage) d.storageMW += r.mw;  // pure storage permits; co-located storage size is not stated in the register
   if(r.solar||r.wind){ d.vre += r.mw; if(!r.storage) d.vreNoStore += r.mw; }
 });
+// Districts with no permits in the register (Comrat, Vulcănești) still appear, with zero queue.
+Object.entries(DATA.districts).forEach(([k,v])=>{ if(!dist[k]) dist[k]={key:k,...v,rows:[],mw:0,solar:0,wind:0,storageMW:0,thermal:0,vreNoStore:0,vre:0,lbMW:0}; });
 const D = Object.values(dist);
 D.forEach(d=>{ let best=null; rightBank.forEach(n=>{ const k=hav(d.ll,n.ll); if(!best||k<best.km) best={km:k,node:n}; }); d.nearest=best; d.coLocated=d.rows.filter(r=>r.storage&&(r.solar||r.wind)).length; d.expired=d.rows.filter(r=>r.expiry<TODAY).length; });
-const regionName = r => T(r, {North:'Север',Centre:'Центр',South:'Юг'}[r]||r);
+const regionName = r => r==='Gagauzia' ? T('Gagauzia (UTA)','Гагаузия (АТО)') : T(r, {North:'Север',Centre:'Центр',South:'Юг'}[r]||r);
+// Substations in Gagauzia: Moldelectrica TYNDP 2025-2034 (pp. 36, 78, 141-170); queue from the permit register.
+const GAG = {
+  Vulcanesti: [['Substation','Подстанция','400/110/35/10 kV','400/110/35/10 кВ'],
+    ['Transformer','Трансформатор','Autotransformer AT1, 250 MVA (1972), to be replaced in 2028 (€4.0M)','Автотрансформатор АТ1, 250 МВА (1972), замена в 2028 г. (€4,0 млн)'],
+    ['Lines','Линии','400 kV to Chișinău, Isaccea (RO) and MGRES; 110 kV to Bolgrad (UA), three circuits','400 кВ на Кишинёв, Исакчу (Румыния) и МГРЭС; 110 кВ на Болград (Украина), три цепи'],
+    ['Planned','Планы','150 MVAr reactor 2027 (€5.1M); candidates by 2033: 400 kV to Smârdan (RO) and Artsyz (UA), new 110 kV to Bolgrad, a phase-shifting transformer on the Isaccea line','Реактор 150 МВАр в 2027 г. (€5,1 млн); кандидаты к 2033 г.: 400 кВ на Смырдан (Румыния) и Арциз (Украина), новая 110 кВ на Болград, фазоповоротный трансформатор на линии Исакча'],
+    ['Constraint','Ограничение','N-1 overloads on 400 kV Vulcănești–Isaccea and 110 kV Vulcănești–Bolgrad, from Romania–Ukraine transit','Перегрузки при N-1 на 400 кВ Вулкэнешть–Исакча и 110 кВ Вулкэнешть–Болград из-за транзита Румыния–Украина']],
+  Comrat: [['Substation','Подстанция','110/35/10 kV','110/35/10 кВ'],
+    ['Transformer','Трансформатор','T1, 16 MVA (1970), to be replaced by 2034 (€1.15M)','Т1, 16 МВА (1970), замена к 2034 г. (€1,15 млн)'],
+    ['Lines','Линии','110 kV Comrat–Bașcalia, to be rebuilt in 2027 (14.7 km, €1.6M)','110 кВ Комрат–Баскалия, реконструкция в 2027 г. (14,7 км, €1,6 млн)'],
+    ['Planned','Планы','Proposed new 400 kV substation "Comratul Nou" with a 400 kV line to Smârdan (RO), 84 km in Moldova, €66.6M for the whole project, a candidate by 2033','Предложена новая подстанция 400 кВ «Comratul Nou» с линией 400 кВ на Смырдан (Румыния), 84 км по Молдове, €66,6 млн на весь проект, кандидат к 2033 г.']],
+  'Ceadir-Lunga': [['Substation','Подстанция','110/10 kV','110/10 кВ'],
+    ['Transformers','Трансформаторы','T1 16 MVA (1985) and T2 16 MVA (1981), both to be replaced after 2034 (€1.15M each)','Т1 16 МВА (1985) и Т2 16 МВА (1981), замена обоих после 2034 г. (по €1,15 млн)']],
+};
 const pct = (arr, v, inverse=false) => { // percentile rank 0..1, ties averaged
   const below=arr.filter(x=>inverse? x>v : x<v).length, eq=arr.filter(x=>x===v).length; return (below+ (eq-1)/2)/(arr.length-1); };
 function score(){
@@ -94,7 +110,7 @@ function score(){
 function fits(d){
   const f=[];
   if(d.vre>=20 && d.vreNoStore>=10) f.push({c:'bess',t:T('BESS beside renewables','СНЭЭ рядом с ВИЭ'),why:T(`${fmt(d.vreNoStore,1)} MW of solar/wind permits here have no storage attached, so a co-located battery could absorb midday or windy-hour surplus.`,`${fmt(d.vreNoStore,1)} МВт разрешений на солнце/ветер здесь без накопителя, поэтому батарея рядом могла бы забирать избыток в полдень или в ветреные часы.`)});
-  if(d.nearest.km<=15) f.push({c:'node',t:T('Grid-scale BESS','Сетевая СНЭЭ'),why:T(`The seat is ${fmt(d.nearest.km,0)} km from the ${d.nearest.node.name} ${d.nearest.node.kv} kV node, a strong point for a balancing battery (aFRR/mFRR) and peak shaving.`,`Райцентр в ${fmt(d.nearest.km,0)} км от узла ${d.nearest.node.name} ${d.nearest.node.kv} кВ: сильная точка сети для балансирующей батареи (aFRR/mFRR) и срезания пиков.`)});
+  if(d.nearest.km<=15) f.push({c:'node',t:T('Grid-scale BESS','Сетевая СНЭЭ'),why: d.nearest.km<1 ? T(`The ${d.nearest.node.name} ${d.nearest.node.kv} kV node is in this district, a strong point for a balancing battery (aFRR/mFRR) and peak shaving.`,`Узел ${d.nearest.node.name} ${d.nearest.node.kv} кВ находится в этом районе: сильная точка сети для балансирующей батареи (aFRR/mFRR) и срезания пиков.`) : T(`The seat is ${fmt(d.nearest.km,0)} km from the ${d.nearest.node.name} ${d.nearest.node.kv} kV node, a strong point for a balancing battery (aFRR/mFRR) and peak shaving.`,`Райцентр в ${fmt(d.nearest.km,0)} км от узла ${d.nearest.node.name} ${d.nearest.node.kv} кВ: сильная точка сети для балансирующей батареи (aFRR/mFRR) и срезания пиков.`)});
   if(d.solar>=10) f.push({c:'load',t:T('Daytime flexible load','Гибкая дневная нагрузка'),why:T(`${fmt(d.solar,1)} MW of solar is queued. Load that can shift into 10:00–17:00 would buy at the low midday prices.`,`В очереди ${fmt(d.solar,1)} МВт солнца. Нагрузка, которую можно сдвинуть на 10:00–17:00, покупала бы по низким дневным ценам.`)});
   if(!f.length) f.push({c:'watch',t:T('Watch','Наблюдать'),why:T('Too little is queued here to point to a clear asset. Keep it on the watch list.','Здесь слишком мало в очереди, чтобы указать на конкретный актив. Оставьте в списке наблюдения.')});
   return f;
@@ -115,24 +131,29 @@ link(N.str,DATA.ext.gut,true,'Gutinaș (RO) 2029','below');
 DATA.nodes.forEach(n=>{ const g=el('g',{},map); const left=['mgr','rib'].includes(n.id);
   el('rect',{x:n.xy[0]-5,y:n.xy[1]-5,width:10,height:10,transform:`rotate(45 ${n.xy[0]} ${n.xy[1]})`,fill:left?'var(--muted)':'var(--ink)'},g);
   const t=el('text',{x:n.xy[0]+9,y:n.xy[1]-7,'font-size':11.5,'font-weight':600,fill:left?'var(--muted)':'var(--ink)'},g); t.textContent=n.name; });
+const gagD = ['Comrat','Ceadir-Lunga','Vulcanesti'].map(k=>DATA.districts[k].xy);
+const gcx = gagD.reduce((a,p)=>a+p[0],0)/3, gcy = (Math.min(...gagD.map(p=>p[1]))+Math.max(...gagD.map(p=>p[1])))/2;
+el('ellipse',{cx:gcx,cy:gcy,rx:58,ry:(Math.max(...gagD.map(p=>p[1]))-Math.min(...gagD.map(p=>p[1])))/2+34,fill:'none',stroke:'var(--muted)','stroke-width':1.2,'stroke-dasharray':'4 4'},map);
+const gagLabel = el('text',{x:gcx+62,y:gcy-40,'font-size':11.5,'font-style':'italic',fill:'var(--muted)'},map);
 const dotLayer=el('g',{},map), labelLayer=el('g',{'pointer-events':'none'},map);
 let selected=null;
 function drawMap(){
   map.setAttribute('aria-label', T('Map of Moldova with districts sized by permitted MW','Карта Молдовы: районы по объёму разрешённых МВт'));
+  gagLabel.textContent = T('UTA Găgăuzia','АТО Гагаузия');
   dotLayer.innerHTML=''; labelLayer.innerHTML='';
   [...D].sort((a,b)=>b.mw-a.mw).forEach(d=>{
     const r=4+Math.sqrt(d.mw)*1.7;
     const c=el('circle',{cx:d.xy[0],cy:d.xy[1],r,fill:rampVar(d.score),'fill-opacity':.88,stroke:d.key===selected?'var(--ink)':'var(--panel)','stroke-width':d.key===selected?3:1.5,class:'district-dot',tabindex:0,role:'button','aria-label':T(`${d.name}: score ${Math.round(d.score)}, ${fmt(d.mw,1)} MW permitted`,`${d.name}: балл ${Math.round(d.score)}, разрешено ${fmt(d.mw,1)} МВт`)},dotLayer);
     const tt=el('title',{},c); tt.textContent=T(`${d.name} · ${fmt(d.mw,1)} MW · score ${Math.round(d.score)}`,`${d.name} · ${fmt(d.mw,1)} МВт · балл ${Math.round(d.score)}`);
     c.addEventListener('click',()=>select(d.key)); c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(d.key);}});
-    if((d.mw>=40&&!['Balti','Straseni','Chisinau'].includes(d.key))||d.key===selected){ const t=el('text',{x:d.xy[0],y:d.xy[1]+r+13,'text-anchor':'middle','font-size':12,'font-weight':600,fill:'var(--ink)',stroke:'var(--panel)','stroke-width':3,'paint-order':'stroke'},labelLayer); t.textContent=d.name; }
+    if(!['Balti','Straseni','Chisinau','Vulcanesti'].includes(d.key)&&(d.mw>=40||d.region==='Gagauzia'||d.key===selected)){ const t=el('text',{x:d.xy[0],y:d.xy[1]+r+13,'text-anchor':'middle','font-size':12,'font-weight':600,fill:'var(--ink)',stroke:'var(--panel)','stroke-width':3,'paint-order':'stroke'},labelLayer); t.textContent=d.name; }
   });
 }
 /* ---- ranking table ---- */
 function mixBar(d){ const tot=d.solar+d.wind+d.thermal+d.storageMW||1;
   return `<span class="mix" title="${T('solar','солнце')} ${fmt(d.solar,1)} · ${T('wind','ветер')} ${fmt(d.wind,1)} · ${T('storage-only','только накопители')} ${fmt(d.storageMW,1)} · ${T('thermal','тепловые')} ${fmt(d.thermal,1)} ${T('MW','МВт')}">${[['solar','--solar'],['wind','--wind'],['storageMW','--storage'],['thermal','--thermal']].map(([k,c])=>`<i style="width:${100*d[k]/tot}%;background:var(${c})"></i>`).join('')}</span>`; }
 function drawRank(){
-  $('#rankBody').innerHTML = D.filter(d=>!southOnly||d.region==='South').map(d=>`<tr tabindex="0" data-k="${d.key}" class="${d.key===selected?'sel':''}">
+  $('#rankBody').innerHTML = D.filter(inFilter).map(d=>`<tr tabindex="0" data-k="${d.key}" class="${d.key===selected?'sel':''}">
     <td>${d.name}<div class="label-note">${regionName(d.region)}</div></td>
     <td><span class="scorebar"><i style="width:${Math.max(2,d.score*0.6)}px"></i><span class="num">${Math.round(d.score)}</span></span></td>
     <td class="r num">${fmt(d.mw,1)}</td><td>${mixBar(d)}</td>
@@ -143,7 +164,8 @@ function drawRank(){
 const tags = r => `${r.solar?`<span class="tag s">${T('solar','солнце')}</span>`:''}${r.wind?`<span class="tag w">${T('wind','ветер')}</span>`:''}${r.storage?`<span class="tag b">${T('storage','накопитель')}</span>`:''}${r.thermal?'<span class="tag t">'+(r.type.startsWith('Motoare')?T('gas engines','газопоршневые'):T('CHP','ТЭЦ'))+'</span>':''}${r.lb?`<span class="tag lb" title="${T('Connection point names a substation in the Transnistrian region','Точка подключения называет подстанцию в Приднестровском регионе')}">${T('via MGRES/Bender','через МГРЭС/Бендеры')}</span>`:''}`;
 function drawDetail(){
   const d=D.find(x=>x.key===selected); const rank=D.indexOf(d)+1;
-  const pv = p => T(`${Math.round(p*100)}th pct`,`${Math.round(p*100)}-й перцентиль`);
+  const ord = n => { const s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
+  const pv = p => T(`${ord(Math.round(p*100))} pct`,`${Math.round(p*100)}-й перцентиль`);
   const nP = d.rows.length;
   $('#detail').innerHTML = `
   <div class="dhead"><div><span class="eyebrow">${T('District card','Карточка района')} · ${regionName(d.region)} · ${T(`rank ${rank} of ${D.length}`,`место ${rank} из ${D.length}`)}</span><h2>${d.name}</h2></div>
@@ -156,18 +178,22 @@ function drawDetail(){
     <div class="feat"><span class="label-note">${T('Storage in the queue','Накопители в очереди')}</span><span class="v">${fmt(d.storageMW,1)} ${T('MW','МВт')}</span><span class="p">${T(`standalone, plus ${d.coLocated} co-located ${d.coLocated===1?'permit':'permits'} of unstated size`,`автономные, плюс совмещённых разрешений неуказанного размера: ${d.coLocated}`)}</span></div>
   </div>
   ${d.fits.map(f=>`<div class="why"><span class="fit ${f.c}">${f.t}</span> ${f.why}</div>`).join('')}
+  ${GAG[d.key]?`<div class="gagbox"><h3>${T('Grid in this district','Сеть в этом районе')}</h3><dl>${GAG[d.key].map(r=>`<dt>${T(r[0],r[1])}</dt><dd>${T(r[2],r[3])}</dd>`).join('')}</dl><p class="label-note">${T('Source:','Источник:')} <a href="#src-tyndp25">${T('Moldelectrica TYNDP 2025–2034','План развития Moldelectrica 2025–2034')}</a></p></div>`:''}
   ${d.expired?`<p class="label-note"><span class="exp">${T(`${d.expired} ${d.expired>1?'permits':'permit'} past expiry`,`Истёк срок: ${d.expired} ${plural(d.expired,'','','разрешение','разрешения','разрешений')}`)}</span> ${T("on today's date. They are still counted, because the register predates their expiry and may since have been extended.",'на сегодняшнюю дату. Они учитываются, так как реестр составлен до истечения срока и разрешения могли быть продлены.')}</p>`:''}
-  <div class="tablewrap"><table class="permits"><thead><tr><th>#</th><th>${T('Connection point','Точка подключения')}</th><th>${T('Type','Тип')}</th><th class="r">${T('MW','МВт')}</th><th>${T('Holder','Владелец')}</th><th>${T('Valid to','Действует до')}</th></tr></thead><tbody>
+  ${d.rows.length?'':`<p class="label-note">${T("No permits in Moldelectrica's register here (edition 14 Aug 2026). That means no queue to compete with, not that capacity is free.",'В реестре Moldelectrica здесь нет разрешений (редакция 14.08.2026). Это значит, что нет очереди-конкурента, но не означает, что мощность свободна.')}</p>`}
+  <div class="tablewrap"${d.rows.length?'':' hidden'}><table class="permits"><thead><tr><th>#</th><th>${T('Connection point','Точка подключения')}</th><th>${T('Type','Тип')}</th><th class="r">${T('MW','МВт')}</th><th>${T('Holder','Владелец')}</th><th>${T('Valid to','Действует до')}</th></tr></thead><tbody>
   ${[...d.rows].sort((a,b)=>b.mw-a.mw).map(r=>`<tr><td class="num">${r.nr}</td><td>${r.point}</td><td>${tags(r)}</td><td class="r num">${fmt(r.mw,1)}</td><td>${r.applicant}</td><td class="num ${r.expiry<TODAY?'exp':''}">${r.expiry}</td></tr>`).join('')}
   </tbody></table></div>
   <p class="label-note">${T('Source:','Источник:')} <a href="#src-reg">${T('Moldelectrica permit register, 14 Aug 2026','реестр разрешений Moldelectrica, 14.08.2026')}</a>. ${T('Permits are as filed; MW is the permitted connection capacity.','Разрешения приведены как поданы; МВт — разрешённая мощность подключения. Точки подключения — на румынском, как в реестре.')}</p>`;
 }
-let southOnly=false;
-function setFilter(s){ southOnly=s; $('#fAll').setAttribute('aria-pressed',String(!s)); $('#fSouth').setAttribute('aria-pressed',String(s)); if(s && D.find(d=>d.key===selected)?.region!=='South'){ selected=D.find(d=>d.region==='South').key; drawMap(); drawDetail(); } drawRank(); }
+let filt='all';
+const inFilter = d => filt==='south' ? ['South','Gagauzia'].includes(d.region) : filt==='gag' ? d.region==='Gagauzia' : true;
+function setFilter(m){ filt=m; [['fAll','all'],['fSouth','south'],['fGag','gag']].forEach(([id,k])=>$('#'+id).setAttribute('aria-pressed',String(k===m)));
+  if(!inFilter(D.find(d=>d.key===selected))){ selected=D.find(inFilter).key; drawMap(); drawDetail(); } drawRank(); }
 function select(k){ selected=k; drawMap(); drawRank(); drawDetail(); }
 function refresh(){ ['1','2','3'].forEach(i=>$('#o'+i).textContent=$('#w'+i).value); score(); if(!selected) selected=D[0].key; drawMap(); drawRank(); drawDetail(); }
 ['#w1','#w2','#w3'].forEach(s=>$(s).addEventListener('input',refresh));
-$('#fAll').addEventListener('click',()=>setFilter(false)); $('#fSouth').addEventListener('click',()=>setFilter(true));
+$('#fAll').addEventListener('click',()=>setFilter('all')); $('#fSouth').addEventListener('click',()=>setFilter('south')); $('#fGag').addEventListener('click',()=>setFilter('gag'));
 
 /* ---- realised spread (Romanian day-ahead, 15 min) ---- */
 const RO = new Map(RO_BASE.map(x=>[x.date,{...x,src:'stored'}]));
@@ -279,7 +305,7 @@ window.addEventListener('hashchange', showView);
 /* ================= sites ================= */
 // Voltages, notes and register facts per site: registry/entities/md, Moldelectrica permit register (14.08.2026), TYNDP 2025-2034.
 const SITES = [
-  {id:'vul', name:'Vulcănești 400/110/35/10 kV', kv:[110,35,10], def:110, conn:'cell', south:true,
+  {id:'vul', name:'Vulcănești 400/110/35/10 kV', kv:[110,35,10], def:110, conn:'cell', south:true, gag:true,
    note:['110 kV level exists. The 250 MVA autotransformer (1972) is due for replacement in 2028. The plan names N-1 overloads on 400 kV Vulcănești–Isaccea and 110 kV Vulcănești–Bolgrad as its most serious problem: expect operating limits.',
          'Уровень 110 кВ есть. Автотрансформатор 250 МВА (1972) подлежит замене в 2028 г. План называет перегрузки при N-1 на ВЛ 400 кВ Вулкэнешть–Исакча и 110 кВ Вулкэнешть–Болград самой серьёзной проблемой: ожидайте ограничений режима.']},
   {id:'cio', name:'Cioburciu 110/10 kV (Ștefan Vodă)', kv:[110,10], def:110, conn:'tap', south:true, lb:true,
@@ -300,8 +326,10 @@ const SITES = [
    note:['Its one 10 MVA transformer is overloaded: 14.87 MW waiting at 35/10 kV cannot connect until a second transformer arrives after 2034. Connect at 110 kV.','Единственный трансформатор 10 МВА перегружен: 14,87 МВт на 35/10 кВ не могут подключиться до второго трансформатора после 2034 г. Подключайтесь на 110 кВ.']},
   {id:'gug', name:'Gura Galbenei 110/10 kV (Cimișlia)', kv:[110,10], def:110, conn:'tap', south:true,
    note:['Right-bank line Chișinău–Gura Galbenei 110 kV. A 50 MW wind permit is queued here.','Правобережная линия Кишинёв–Гура-Галбеней 110 кВ. Здесь в очереди ветровое разрешение на 50 МВт.']},
-  {id:'cea', name:'Ceadîr-Lunga 110/10 kV', kv:[10], def:10, conn:'cell', south:true,
-   note:['Two 16 MVA transformers (1970s), to be replaced after 2034. A 10 MW solar + storage permit is queued.','Два трансформатора по 16 МВА (1970-е), замена после 2034 г. В очереди разрешение на 10 МВт солнца с накопителем.']},
+  {id:'cea', name:'Ceadîr-Lunga 110/10 kV', kv:[110,10], def:10, conn:'cell', south:true, gag:true,
+   note:['Two 16 MVA transformers (1981 and 1985), to be replaced after 2034. A 10 MW solar + storage permit is queued at a 10 kV cell.','Два трансформатора по 16 МВА (1981 и 1985), замена после 2034 г. В очереди разрешение на 10 МВт солнца с накопителем в ячейке 10 кВ.']},
+  {id:'com', name:'Comrat 110/35/10 kV', kv:[110,35,10], def:110, conn:'cell', south:true, gag:true,
+   note:['Transformer T1 is 16 MVA from 1970, due for replacement by 2034, which limits what 35/10 kV can take. The 110 kV Comrat–Bașcalia line is to be rebuilt in 2027. A new 400 kV "Comratul Nou" substation is proposed as a candidate by 2033. No permits are queued here.','Трансформатор Т1 16 МВА 1970 г., замена к 2034 г., что ограничивает возможности на 35/10 кВ. ВЛ 110 кВ Комрат–Баскалия будет реконструирована в 2027 г. Новая подстанция 400 кВ «Comratul Nou» предложена как кандидат к 2033 г. Разрешений в очереди нет.']},
   {id:'chi', name:'Chișinău 330/110/35 kV', kv:[110,35], def:110, conn:'cell',
    note:['A 20 MW standalone storage permit at 35 kV and a 30 MW wind + storage permit at 110 kV are queued. The new 400 kV line from Vulcănești arrives here.','В очереди автономный накопитель 20 МВт на 35 кВ и ветер с накопителем 30 МВт на 110 кВ. Сюда приходит новая линия 400 кВ из Вулкэнешть.']},
   {id:'bal', name:'Bălți 330/110/35 kV', kv:[110,35], def:110, conn:'cell',
@@ -427,7 +455,8 @@ function bomCSV(){
 }
 function fillSites(){
   const site = document.getElementById('eqSite'); const cur = site.value || SITES[0].id;
-  site.innerHTML = `<optgroup label="${T('South','Юг')}">`+SITES.filter(s=>s.south).map(s=>`<option value="${s.id}">${siteName(s)}</option>`).join('')+'</optgroup>'
+  site.innerHTML = `<optgroup label="${T('Gagauzia (UTA)','Гагаузия (АТО)')}">`+SITES.filter(s=>s.gag).map(s=>`<option value="${s.id}">${siteName(s)}</option>`).join('')+'</optgroup>'
+    + `<optgroup label="${T('South','Юг')}">`+SITES.filter(s=>s.south&&!s.gag).map(s=>`<option value="${s.id}">${siteName(s)}</option>`).join('')+'</optgroup>'
     + `<optgroup label="${T('Backbone and other','Магистральные и другие')}">`+SITES.filter(s=>!s.south).map(s=>`<option value="${s.id}">${siteName(s)}</option>`).join('')+'</optgroup>';
   site.value = cur;
 }

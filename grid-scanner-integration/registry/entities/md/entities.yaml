@@ -32,8 +32,8 @@ entities:
     kind: substation
     parent: md.zone.md
     name: Vulcănești
-    attributes: {voltage_kv: [400], operator: Moldelectrica, territory: right_bank,
-                 note: "400 kV to Isaccea (RO) and, since 2026-11-08, to Chișinău; switchyard extension ~94% at 2026-06-30. Lower voltages not established."}
+    attributes: {voltage_kv: [400, 110, 35, 10], operator: Moldelectrica, territory: right_bank, district: Vulcănești (UTA Găgăuzia),
+                 note: "AT1 250 MVA (1972), replacement 2028 (EUR 4.0M); 150 MVAr reactor 2027; 400 kV to Isaccea (RO), MGRES and, since 2026-11-08, Chișinău; 110 kV Vulcănești-Bolgrad (UA) x3; N-1 overloads on Isaccea and Bolgrad lines (TYNDP 2025-2034 pp. 141-170)"}
   - id: md.substation.mgres
     kind: substation
     parent: md.zone.md
@@ -80,7 +80,14 @@ entities:
     kind: substation
     parent: md.zone.md
     name: Ceadîr-Lunga
-    attributes: {voltage_kv: [110, 10], district: Ceadîr-Lunga (UTA Găgăuzia), territory: right_bank}
+    attributes: {voltage_kv: [110, 10], district: Ceadîr-Lunga (UTA Găgăuzia), territory: right_bank,
+                 note: "T1 16 MVA (1985), T2 16 MVA (1981), replacement after 2034 (TYNDP 2025-2034 p. 154)"}
+  - id: md.substation.comrat
+    kind: substation
+    parent: md.zone.md
+    name: Comrat
+    attributes: {voltage_kv: [110, 35, 10], district: Comrat (UTA Găgăuzia), territory: right_bank,
+                 note: "T1 16 MVA (1970), replacement by 2034 (EUR 1.15M); 110 kV Comrat-Bașcalia rebuilt 2027; proposed 400 kV Comratul Nou-Smârdan (RO) candidate by 2033 (TYNDP 2025-2034 pp. 151-170)"}
   - id: md.substation.gura_galbenei
     kind: substation
     parent: md.zone.md

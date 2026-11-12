@@ -9,10 +9,10 @@ const seats = {
  "Orhei":[47.38,28.82,"Centre"],"Rezina":[47.75,28.96,"Centre"],"Soldanesti":[47.82,28.80,"Centre"],"Telenesti":[47.50,28.37,"Centre"],
  "Straseni":[47.14,28.61,"Centre"],"Ialoveni":[46.94,28.78,"Centre"],"Hincesti":[46.83,28.59,"Centre"],"Nisporeni":[47.08,28.18,"Centre"],
  "Ungheni":[47.21,27.80,"Centre"],"Chisinau":[47.01,28.86,"Centre"],"Anenii Noi":[46.88,29.23,"Centre"],
- "Stefan Voda":[46.51,29.66,"South"],"Causeni":[46.64,29.41,"South"],"Cimislia":[46.52,28.78,"South"],"Leova":[46.48,28.25,"South"],"Ceadir-Lunga":[46.06,28.83,"South"]};
+ "Stefan Voda":[46.51,29.66,"South"],"Causeni":[46.64,29.41,"South"],"Cimislia":[46.52,28.78,"South"],"Leova":[46.48,28.25,"South"],"Ceadir-Lunga":[46.06,28.83,"Gagauzia"],"Comrat":[46.30,28.66,"Gagauzia"],"Vulcanesti":[45.68,28.40,"Gagauzia"]};
 const disp = {"Donduseni":"Dondușeni","Singerei":"Sîngerei","Falesti":"Fălești","Riscani":"Rîșcani","Floresti":"Florești","Balti":"Bălți",
  "Soldanesti":"Șoldănești","Telenesti":"Telenești","Straseni":"Strășeni","Hincesti":"Hîncești","Chisinau":"Chișinău","Stefan Voda":"Ștefan Vodă",
- "Causeni":"Căușeni","Cimislia":"Cimișlia","Ceadir-Lunga":"Ceadîr-Lunga"};
+ "Causeni":"Căușeni","Cimislia":"Cimișlia","Ceadir-Lunga":"Ceadîr-Lunga","Vulcanesti":"Vulcănești"};
 const typeMap = s => ({solar:/Solar|Fotovolt/.test(s), wind:/Eolian/.test(s), storage:/Stocare/.test(s), thermal:/Cogenerare|Motoare/.test(s)});
 const rows = lines.map(l => { const [nr,issue,exp,ext,expExt,loc,point,type,mw,app] = l.split('|');
   let d = (loc.match(/r-(?:nul|l) ([A-Za-z\- ]+)$/)||loc.match(/r-nul ([A-Za-z\- ]+),/)||loc.match(/(?:mun\.|or\.) ([A-Za-z\- ]+)$/)||[])[1];
