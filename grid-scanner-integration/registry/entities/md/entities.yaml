@@ -1,0 +1,118 @@
+# Moldova: the 330/400 kV backbone and the 110 kV substations of the south that the Moldelectrica
+# connection-permit register (edition 14.08.2026) names as connection points or line ends.
+# Voltages are as written in the register or in Moldelectrica's TYNDP 2018-2027; positions are not
+# declared (no curated geometry yet). Every entity needs owner review before the country goes active.
+#
+# attributes.territory: transnistrian_region marks substations on the left bank or in Bender, outside
+# the control of the constitutional authorities. Since 1 Jan 2025 MGRES no longer supplies the right
+# bank (IPN, Energocom). Permits whose connection runs through these substations carry a dependency the
+# BESS screen reports (docs/methods/md_south_bess_screen.md); it is a flag, not a judgement on operability,
+# which only Moldelectrica can confirm.
+entities:
+  # Backbone (TYNDP 2018-2027 sections 2-3; Ministry of Energy project update 14.07.2026)
+  - id: md.substation.chisinau
+    kind: substation
+    parent: md.zone.md
+    name: Chișinău
+    attributes: {voltage_kv: [330, 110, 35], voltage_kv_planned: [400], operator: Moldelectrica, territory: right_bank,
+                 note: "400 kV line from Vulcănești energized 2026-11-08 (Romania Insider); substation modernization ~83% at 2026-06-30"}
+  - id: md.substation.balti
+    kind: substation
+    parent: md.zone.md
+    name: Bălți
+    attributes: {voltage_kv: [330, 110, 35], voltage_kv_planned: [400], operator: Moldelectrica, territory: right_bank,
+                 note: "400 kV Bălți-Suceava line contract signed 2026-06-26; 400 kV substation in tender"}
+  - id: md.substation.straseni
+    kind: substation
+    parent: md.zone.md
+    name: Strășeni
+    attributes: {voltage_kv: [330, 110], voltage_kv_planned: [400], operator: Moldelectrica, territory: right_bank,
+                 note: "400 kV Strășeni-Gutinaș; estimated completion December 2032 (to be confirmed)"}
+  - id: md.substation.vulcanesti
+    kind: substation
+    parent: md.zone.md
+    name: Vulcănești
+    attributes: {voltage_kv: [400], operator: Moldelectrica, territory: right_bank,
+                 note: "400 kV to Isaccea (RO) and, since 2026-11-08, to Chișinău; switchyard extension ~94% at 2026-06-30. Lower voltages not established."}
+  - id: md.substation.mgres
+    kind: substation
+    parent: md.zone.md
+    name: MGRES (CERS Moldovenească)
+    attributes: {voltage_kv: [400, 330, 110], territory: transnistrian_region,
+                 note: "Busbars of the Cuciurgan power station (2,520 MW installed). The register calls it MGRES or CERS Moldovenească."}
+  - id: md.substation.ribnita
+    kind: substation
+    parent: md.zone.md
+    name: Rîbnița
+    attributes: {voltage_kv: [330], territory: transnistrian_region}
+  # 110 kV substations in the south named in the permit register
+  - id: md.substation.cioburciu
+    kind: substation
+    parent: md.zone.md
+    name: Cioburciu
+    attributes: {voltage_kv: [110, 10], district: Ștefan Vodă, territory: right_bank}
+  - id: md.substation.caplani
+    kind: substation
+    parent: md.zone.md
+    name: Caplani
+    attributes: {voltage_kv: [110, 10, 6], district: Ștefan Vodă, territory: right_bank}
+  - id: md.substation.stefan_voda
+    kind: substation
+    parent: md.zone.md
+    name: Ștefan Vodă
+    attributes: {voltage_kv: [110, 35, 10], district: Ștefan Vodă, territory: right_bank}
+  - id: md.substation.olanesti
+    kind: substation
+    parent: md.zone.md
+    name: Olănești
+    attributes: {voltage_kv: [110, 35, 10], district: Ștefan Vodă, territory: right_bank}
+  - id: md.substation.purcari
+    kind: substation
+    parent: md.zone.md
+    name: Purcari
+    attributes: {voltage_kv: [110, 6], district: Ștefan Vodă, territory: right_bank}
+  - id: md.substation.rascaietii_noi
+    kind: substation
+    parent: md.zone.md
+    name: Răscăieții Noi
+    attributes: {voltage_kv: [110], district: Ștefan Vodă, territory: right_bank, note: "Named only as a line end in the register"}
+  - id: md.substation.ceadir_lunga
+    kind: substation
+    parent: md.zone.md
+    name: Ceadîr-Lunga
+    attributes: {voltage_kv: [110, 10], district: Ceadîr-Lunga (UTA Găgăuzia), territory: right_bank}
+  - id: md.substation.gura_galbenei
+    kind: substation
+    parent: md.zone.md
+    name: Gura Galbenei
+    attributes: {voltage_kv: [110, 10], district: Cimișlia, territory: right_bank}
+  - id: md.substation.iargara
+    kind: substation
+    parent: md.zone.md
+    name: Iargara
+    attributes: {voltage_kv: [110, 10], district: Leova, territory: right_bank}
+  - id: md.substation.cneazevca
+    kind: substation
+    parent: md.zone.md
+    name: Cneazevca
+    attributes: {voltage_kv: [110, 10], district: Leova, territory: right_bank}
+  - id: md.substation.taraclia_nord
+    kind: substation
+    parent: md.zone.md
+    name: Taraclia Nord
+    attributes: {voltage_kv: [110], territory: right_bank, note: "Named only as a line end (LEA 110 kV Taraclia Nord - Basarabeasca); the permit site is Taraclia village, Căușeni district"}
+  - id: md.substation.basarabeasca
+    kind: substation
+    parent: md.zone.md
+    name: Basarabeasca
+    attributes: {voltage_kv: [110], district: Basarabeasca, territory: right_bank, note: "Named only as a line end"}
+  - id: md.substation.varnita
+    kind: substation
+    parent: md.zone.md
+    name: Vărnița
+    attributes: {voltage_kv: [110], district: Anenii Noi, territory: right_bank, note: "Named only as a line end (LEA 110 kV Varnita - Bender Centru)"}
+  - id: md.substation.bender_centru
+    kind: substation
+    parent: md.zone.md
+    name: Bender Centru
+    attributes: {voltage_kv: [110], territory: transnistrian_region, note: "Named only as a line end; Bender is outside the constitutional authorities' control"}

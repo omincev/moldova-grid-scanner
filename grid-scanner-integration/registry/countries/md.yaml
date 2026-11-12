@@ -1,0 +1,20 @@
+# Draft. Owner: to be named (CODEOWNERS has no Moldova line yet). Verify before status becomes active.
+# Moldova is one bidding zone, synchronous with Continental Europe since March 2022, with Moldelectrica
+# as TSO. Its first use case: screening battery storage (BESS) sites in southern Moldova
+# (docs/methods/md_south_bess_screen.md).
+code: md
+name: Moldova
+status: draft
+timezone: Europe/Chisinau
+currency: MDL
+reporting_currency: EUR
+tso: Moldelectrica
+# municipality = raion (district) and municipiu; tso_area = Moldelectrica's territorial branches.
+geography_levels: [country, zone, tso_area, dso_area, substation, municipality, site]
+zones:
+  # EIC passes the check-character test (make contracts) but has not been checked against ENTSO-E's
+  # area list or the EIC registry CSV: confirm there (BZN|MD) before setting eic_verified to true.
+  # While false, the ENTSO-E base tier does not cover this zone.
+  - {id: md.zone.md, short: MD, name: Moldova, eic: 10Y1001A1001A990, eic_verified: false}
+precedence: {}
+reference_zones: []

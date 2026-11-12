@@ -1,0 +1,494 @@
+<title>Moldova Grid Scanner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: control-room sheet. System strip on top, then map + ranked districts side by side, then detail, calculator, gaps, sources. */
+:root{
+  --bg:#f2f4f3; --panel:#ffffff; --ink:#15211f; --muted:#5b6b67; --line:#d5dcd9;
+  --accent:#0b6e63; --accent-soft:#d8ece8;
+  --solar:#c98a12; --wind:#2f6fb0; --storage:#7a4fb5; --thermal:#8a6e5a;
+  --warn:#b4541a; --ok:#2c7a3f;
+  --ramp0:#e3efec; --ramp1:#9fcfc5; --ramp2:#3f9a8b; --ramp3:#0b5f55;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1615; --panel:#162120; --ink:#e3ebe8; --muted:#93a6a1; --line:#2a3a37;
+  --accent:#4cc1ae; --accent-soft:#183a35;
+  --solar:#e6ac3c; --wind:#6ea7e0; --storage:#a985dc; --thermal:#b89880;
+  --warn:#e98b52; --ok:#62b878;
+  --ramp0:#1f3431; --ramp1:#2b6b61; --ramp2:#3aa290; --ramp3:#7fe0cd; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1615; --panel:#162120; --ink:#e3ebe8; --muted:#93a6a1; --line:#2a3a37;
+  --accent:#4cc1ae; --accent-soft:#183a35;
+  --solar:#e6ac3c; --wind:#6ea7e0; --storage:#a985dc; --thermal:#b89880;
+  --warn:#e98b52; --ok:#62b878;
+  --ramp0:#1f3431; --ramp1:#2b6b61; --ramp2:#3aa290; --ramp3:#7fe0cd; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4vw,40px);font-weight:800}
+h2{font-size:21px;font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:68ch}
+header{display:flex;flex-direction:column;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.chip{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--panel);color:var(--muted)}
+.chip b{color:var(--ink);font-weight:500}
+section{display:flex;flex-direction:column;gap:14px}
+.sec-head{display:flex;flex-direction:column;gap:4px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .v{font-family:var(--f-display);font-size:26px;font-weight:700;line-height:1.1}
+.kpi .v small{font-size:14px;font-weight:500;color:var(--muted)}
+.kpi .l{font-size:13px}
+.kpi .s{font-size:11.5px;color:var(--muted)}
+.kpi .s a{color:var(--muted)}
+/* price shape */
+.shape{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.shape .panel{padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.shape svg{width:100%;height:auto;display:block}
+/* scanner */
+.scanner{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+.mapbox{padding:12px;position:relative}
+.mapbox>svg{width:100%;height:auto;display:block;max-height:760px}
+.legend svg{flex:none}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);padding:4px 6px 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:50%;display:inline-block}
+.ln{width:22px;height:0;border-top:2.5px solid var(--accent);display:inline-block}
+.ln.d{border-top-style:dashed}
+.ln.g{border-top-color:var(--muted)}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.weights{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) 120px 36px;gap:10px;align-items:center;font-size:13px}
+.wrow output{font-family:var(--f-mono);text-align:right;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.rank{padding:4px 0}
+.rank table{width:100%;border-collapse:collapse;font-size:13px}
+.rank th{font-weight:500;color:var(--muted);text-align:left;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--line)}
+.rank td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.rank tr:last-child td{border-bottom:0}
+.rank tbody tr{cursor:pointer}
+.rank tbody tr:hover td{background:var(--accent-soft)}
+.rank tbody tr.sel td{background:var(--accent-soft)}
+.rank tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.rank .r{text-align:right}
+.scorebar{display:flex;align-items:center;gap:8px}
+.scorebar i{display:block;height:6px;border-radius:3px;background:var(--accent)}
+.mix{display:flex;height:8px;width:90px;border-radius:2px;overflow:hidden;background:var(--line)}
+.mix i{display:block;height:100%}
+.fit{font-size:11.5px;border-radius:4px;padding:2px 7px;white-space:nowrap;border:1px solid currentColor;display:inline-block}
+.fit.bess{color:var(--storage)}
+.fit.node{color:var(--accent)}
+.fit.load{color:var(--solar)}
+.fit.watch{color:var(--muted)}
+.tablewrap{overflow-x:auto}
+/* detail */
+.detail{padding:18px;display:flex;flex-direction:column;gap:14px}
+.dhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:baseline}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.feat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.feat .v{font-family:var(--f-mono);font-size:18px}
+.feat .p{font-size:11.5px;color:var(--muted)}
+.why{font-size:13.5px;border-left:3px solid var(--accent);padding:6px 12px;background:var(--accent-soft);border-radius:0 6px 6px 0}
+.permits{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}
+.permits th{text-align:left;font-weight:500;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+.permits td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.permits .r{text-align:right}
+.tag{font-size:11px;border-radius:3px;padding:1px 5px;margin-right:3px;color:var(--panel);display:inline-block}
+.tag.s{background:var(--solar)} .tag.w{background:var(--wind)} .tag.b{background:var(--storage)} .tag.t{background:var(--thermal)}
+.exp{color:var(--warn);font-weight:600}
+/* calculator */
+.calc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.calc .panel{padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.fields input,.fields select{font-family:var(--f-mono);font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%}
+.fields input:focus-visible,.fields select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.fieldset-title{grid-column:1/-1;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);margin-top:4px}
+.result .big{font-family:var(--f-display);font-size:34px;font-weight:800;line-height:1.1}
+.result .big small{font-size:15px;color:var(--muted);font-weight:500}
+.rangebar{position:relative;height:30px;margin-top:6px}
+.rangebar .track{position:absolute;left:0;right:0;top:13px;height:4px;background:var(--line);border-radius:2px}
+.rangebar .fill{position:absolute;top:9px;height:12px;background:var(--accent);border-radius:3px;opacity:.85}
+.label-note{font-size:12px;color:var(--muted)}
+.brk{width:100%;border-collapse:collapse;font-size:13px}
+.brk td{padding:5px 0;border-bottom:1px dashed var(--line)}
+.brk td.r{text-align:right;font-family:var(--f-mono)}
+/* timeline */
+.tl{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.tl .item{padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tl .yr{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.state{font-size:11px;font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.06em}
+.state.on{color:var(--ok)} .state.plan{color:var(--warn)}
+/* gaps + sources */
+.gaps{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.gap{padding:12px 14px;font-size:13.5px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.gap b{font-weight:600}
+.sources ol{margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px;columns:1}
+.sources li{overflow-wrap:anywhere}
+.foot{font-size:12px;color:var(--muted)}
+svg text{font-family:var(--f-body)}
+.district-dot{cursor:pointer;transition:stroke-width .15s}
+.district-dot:focus-visible{outline:none;stroke:var(--ink);stroke-width:3}
+.south-kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.cands{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.cand{padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cand h3{font-size:17px}
+.cand dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;margin:0;font-size:13px}
+.cand dt{color:var(--muted)}
+.cand dd{margin:0;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.cand ul{margin:0;padding-left:18px;font-size:13.5px;display:flex;flex-direction:column;gap:4px}
+.cand .lbl{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase}
+.cand .lbl.ok{color:var(--ok)} .cand .lbl.risk{color:var(--warn)}
+.cand .next{font-size:13px;border-top:1px dashed var(--line);padding-top:8px}
+.verdict{padding:16px 18px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--warn);border-radius:0 10px 10px 0}
+.verdict p{max-width:80ch}
+.filters{display:flex;gap:6px;padding:10px 10px 6px}
+.filters button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.filters button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tag.lb{background:var(--warn)}
+@media (max-width:900px){.scanner,.calc,.shape{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.rank th:nth-child(4),.rank td:nth-child(4){display:none}}
+@media (max-width:480px){.fields{grid-template-columns:minmax(0,1fr)}.wrow{grid-template-columns:minmax(0,1fr) 90px 32px}.kpi .v{font-size:22px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">Grid opportunity scanner · Republic of Moldova · bidding zone MD</span>
+  <h1>Moldova Grid Scanner</h1>
+  <p class="lede">Where on Moldova's grid a flexible asset could make money, which asset fits, and roughly what a battery earns. Built the same way as the Danish scanner: public data only, every figure linked to its source, gaps left as gaps.</p>
+  <div class="chips">
+    <span class="chip">Snapshot <b>12 Nov 2026</b></span>
+    <span class="chip">Permit register <b>Moldelectrica, 14 Aug 2026</b></span>
+    <span class="chip">Hourly prices <b>not loaded</b></span>
+    <span class="chip">Hosting-capacity map <b>none published</b></span>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Zone card · MD</span><h2>The system in six numbers</h2></div>
+  <div class="kpis">
+    <div class="kpi"><span class="v">1,044 <small>MW</small></span><span class="l">Installed renewables, end Apr 2026</span><span class="s">PV 764 · wind 255 · <a href="#src-watchdog">WatchDog.MD</a></span></div>
+    <div class="kpi"><span class="v">48.8<small>%</small></span><span class="l">Supply imported from Romania, Q2 2026</span><span class="s">RES 36.7%, Ukraine 7.1%, CHP 7.0% · <a href="#src-anre">ANRE</a></span></div>
+    <div class="kpi"><span class="v">&gt;600 <small>MW</small></span><span class="l">Peak-hour deficit covered by imports</span><span class="s"><a href="#src-watchdog">WatchDog.MD</a>, Jun 2026</span></div>
+    <div class="kpi"><span class="v">150 <small>/ 600 MW</small></span><span class="l">Storage installed vs. ministry's stated need</span><span class="s">~200 MW expected by end 2026 · <a href="#src-watchdog">WatchDog.MD</a></span></div>
+    <div class="kpi"><span class="v">129 <small>€/MWh</small></span><span class="l">Day-ahead avg on record day (7,428 MWh, 2 Oct 2026)</span><span class="s">OPEM market, 21 participants · <a href="#src-invest">InvesTenergy</a></span></div>
+    <div class="kpi"><span class="v">195.9 <small>€/MWh</small></span><span class="l">Energocom weighted purchase price, Oct 2026</span><span class="s">Sep: 157.4 · 77% imported · <a href="#src-realitatea">Realitatea</a></span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Feature F1 · price spread (system level)</span><h2>Where the battery margin comes from</h2>
+  <p class="lede">Moldova buys a large share of its power on the Romanian day-ahead market, so the daily price shape follows Romania's. The bars show the price ranges reported for each season. They are reported ranges, not hourly data this page computed.</p></div>
+  <div class="shape">
+    <div class="panel"><h3>Spring and summer</h3><svg id="shapeSummer" viewBox="0 0 420 170" role="img" aria-label="Spring and summer price ranges: midday 0 to 25 euro per MWh, peak 100 to 200"></svg><span class="label-note">Midday (10:00–17:00 CET) 0–25 €/MWh, negative at times; peak 100–200 €/MWh. Source: <a href="#src-watchdog">WatchDog.MD</a>, p.17.</span></div>
+    <div class="panel"><h3>Autumn and winter</h3><svg id="shapeWinter" viewBox="0 0 420 170" role="img" aria-label="Autumn and winter price ranges: off-peak about 100 euro per MWh, peak 150 to 200"></svg><span class="label-note">Off-peak ~100 €/MWh; peak 150–200 €/MWh. Source: <a href="#src-watchdog">WatchDog.MD</a>, p.17.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Features F6 + F7 · district level</span><h2>Scan the districts</h2>
+  <p class="lede">Moldova publishes no substation capacity map like Denmark's. The closest public signal is Moldelectrica's register of active grid-connection permits: 78 permits, 1,176 MW, each tied to a substation or line. Districts are scored on how much is queued, how much of it is solar or wind with no storage attached, and how close they are to the 330/400 kV backbone. Select a district to see its permits.</p></div>
+  <div class="scanner">
+    <div class="panel mapbox">
+      <svg id="map" role="img" aria-label="Map of Moldova with districts sized by permitted MW"></svg>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--ramp3)"></span>higher score</span>
+        <span><span class="sw" style="background:var(--ramp0);border:1px solid var(--line)"></span>lower score</span>
+        <span>circle area = permitted MW</span>
+        <span><span class="ln"></span>400 kV in service</span>
+        <span><span class="ln d"></span>400 kV planned</span>
+        <span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" transform="rotate(45 6 6)" fill="var(--ink)"/></svg>330/400 kV node</span>
+      </div>
+    </div>
+    <div class="side">
+      <div class="panel weights">
+        <h3>Score weights</h3>
+        <div class="wrow"><label for="w1">Permitted MW queued</label><input id="w1" type="range" min="0" max="100" value="35"><output id="o1">35</output></div>
+        <div class="wrow"><label for="w2">Solar/wind MW without storage</label><input id="w2" type="range" min="0" max="100" value="40"><output id="o2">40</output></div>
+        <div class="wrow"><label for="w3">Closeness to 330/400 kV node</label><input id="w3" type="range" min="0" max="100" value="25"><output id="o3">25</output></div>
+        <p class="label-note">Each feature is turned into a percentile rank across the 26 districts with permits, then weighted and summed to a score from 0 to 100. This is the same method as the Danish congestion score.</p>
+      </div>
+      <div class="panel rank"><div class="filters" role="group" aria-label="Show districts"><button type="button" id="fAll" aria-pressed="true">All districts</button><button type="button" id="fSouth" aria-pressed="false">South only</button></div><div class="tablewrap"><table>
+        <thead><tr><th>District</th><th>Score</th><th class="r">MW</th><th>Mix</th><th>Fits</th></tr></thead>
+        <tbody id="rankBody"></tbody></table></div></div>
+    </div>
+  </div>
+  <div class="panel detail" id="detail" aria-live="polite"></div>
+</section>
+
+<section id="south">
+  <div class="sec-head"><span class="eyebrow">Use case · BESS in southern Moldova</span><h2>Can a battery work in the south?</h2>
+  <p class="lede">The south is where the permits are. It is also where many connections run through 110 kV lines that start at MGRES (the Cuciurgan plant in the Transnistrian region) or end in Bender. MGRES has not supplied the right bank since 1 January 2025. The figures below come from the permit register, edition 14 Aug 2026. "South" here means Ștefan Vodă, Căușeni, Cimișlia, Leova and Ceadîr-Lunga, the southern districts with permits. Cahul, Vulcănești, Comrat, Taraclia, Basarabeasca and Cantemir have none.</p></div>
+  <div class="kpis south-kpis">
+    <div class="kpi"><span class="v">539 <small>MW</small></span><span class="l">Permitted in the south</span><span class="s">26 permits, 46% of the national register, all solar or wind</span></div>
+    <div class="kpi"><span class="v">368 <small>MW</small></span><span class="l">Solar/wind with no storage attached</span><span class="s">The surplus a battery could absorb</span></div>
+    <div class="kpi"><span class="v">0 <small>MW</small></span><span class="l">Standalone storage queued in the south</span><span class="s">vs 84 MW elsewhere (50 at Bălți substation, 20 at Chișinău, others)</span></div>
+    <div class="kpi"><span class="v">346 <small>MW</small></span><span class="l">Connected through MGRES or Bender lines</span><span class="s">64% of the south's permitted MW (12 permits)</span></div>
+  </div>
+  <div class="cands">
+    <div class="panel cand">
+      <span class="lbl ok">Grid-scale BESS · first mover</span>
+      <h3>Vulcănești 400 kV node</h3>
+      <dl><dt>Grid</dt><dd>400 kV to Isaccea (RO) and to Chișinău (since 8 Nov 2026)</dd><dt>Works</dt><dd>400 kV extension ~94% (30 Jun 2026)</dd><dt>Queue nearby</dt><dd>0 MW in Cahul, Vulcănești, Comrat, Taraclia</dd></dl>
+      <ul><li>The strongest point in the south now that it has two 400 kV links, and nobody has a permit near it.</li><li>Suits a balancing battery (aFRR/mFRR) rather than one tied to a wind farm.</li><li>Not known: whether there is a 110 kV or MV level to connect to, and how much capacity is free.</li></ul>
+      <p class="next"><b>Next step:</b> ask Moldelectrica for connection options and capacity at Vulcănești, and the terms of a flexible permit.</p>
+    </div>
+    <div class="panel cand">
+      <span class="lbl risk">Co-located BESS · connection risk</span>
+      <h3>Ștefan Vodă wind cluster</h3>
+      <dl><dt>Permitted</dt><dd>328.9 MW, 18 permits</dd><dt>No storage</dt><dd>170.9 MW</dd><dt>Via MGRES lines</dt><dd>269.5 MW (82%)</dd><dt>Substations</dt><dd>Cioburciu, Caplani, Olănești, Purcari, Ștefan Vodă</dd></dl>
+      <ul><li>The largest renewable cluster in the country, and wind needs storage here.</li><li>Wind-auction winners Leafwind and Navitas hold permits here and must add at least 0.25 MWh per MW. They could be partners or competitors.</li><li>Most connections are taps on 110 kV lines from MGRES. If those lines can't carry power, a battery is stranded with them.</li></ul>
+      <p class="next"><b>Next step:</b> before any revenue case, get Moldelectrica's view on how secure the MGRES–Cioburciu, –Caplani and –Purcari lines are.</p>
+    </div>
+    <div class="panel cand">
+      <span class="lbl ok">Co-located BESS · cleaner grid path</span>
+      <h3>Cimișlia and western Căușeni</h3>
+      <dl><dt>Cimișlia</dt><dd>52.3 MW, 50 MW wind without storage, 0 via Transnistrian-region lines</dd><dt>Căușeni</dt><dd>146 MW wind, 0 storage; 76 MW via Vărnița–Bender, 70 MW via Taraclia Nord–Basarabeasca</dd></dl>
+      <ul><li>Gura Galbenei (50 MW, on the Chișinău–Gura Galbenei 110 kV line) and Taraclia (70 MW, Taraclia Nord–Basarabeasca) connect entirely on the right bank.</li><li>About 120 MW of wind with no storage and a clean path makes this the best co-location target.</li><li>The permits date from 2023 and have been extended to 2027–2028. Check whether the projects are still alive.</li></ul>
+      <p class="next"><b>Next step:</b> approach the GS Blue Energy (Gura Galbenei) and HPI Wind Alpha (Taraclia) projects about adding storage.</p>
+    </div>
+  </div>
+  <div class="panel verdict">
+    <h3>Feasibility in one paragraph</h3>
+    <p>The need is real. The south holds 368 MW of wind and solar with no storage, the system has an evening deficit of over 600 MW, and the Energy Community's study sizes 162 MW of upward reserve for about 1,261 MW of variable renewables. But arbitrage alone does not pay for a battery. At about €1M per MW for 2 hours (the study's capex), €38k–103k per MW per year of arbitrage means a simple payback of about 10–27 years. A southern battery works when it also earns balancing payments or is paid for by a wind project's storage obligation, and when it connects at Vulcănești or on a right-bank line. MGRES-dependent connections in Ștefan Vodă need clearing with Moldelectrica first.</p>
+    <p class="label-note">Sources: permit register (14 Aug 2026); <a href="https://energie.gov.md/sites/default/files/document/attachments/deliverable_4-_res_and_bess_integration_report_final.pdf" target="_blank" rel="noopener">Tetra Tech for the Energy Community Secretariat, May 2025</a>; <a href="https://energie.gov.md/sites/default/files/stadiul_proiectelorprogramelor_de_infrastructura_ale_men_-actualizare_14.07.2026.pdf" target="_blank" rel="noopener">Ministry of Energy project status, 14 Jul 2026</a>; <a href="https://www.old.ipn.md/en/cuciurgan-power-plant-stops-delivering-energy-to-the-right-bank-7966_1110346.html" target="_blank" rel="noopener">IPN on MGRES supply</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Return range v0 · BESS arbitrage</span><h2>What a battery could earn per MW</h2>
+  <p class="lede">This is an upper bound with perfect foresight: one full cycle a day, charging in the cheap window and discharging at the peak. The default prices are the seasonal ranges above. Balancing revenue (aFRR/mFRR), network tariffs, degradation and taxes are not included. Change any input.</p></div>
+  <div class="calc">
+    <div class="panel">
+      <div class="fields">
+        <label for="dur">Duration (hours)<select id="dur"><option value="1">1 h</option><option value="2" selected>2 h</option><option value="3">3 h</option><option value="4">4 h</option></select></label>
+        <label for="rte">Round-trip efficiency (%)<input id="rte" type="number" min="50" max="100" step="1" value="85"></label>
+        <span class="fieldset-title">Spring/summer · 182 days</span>
+        <label for="sLoLo">Charge price, low case (€/MWh)<input id="sLoLo" type="number" step="1" value="25"></label>
+        <label for="sHiLo">Discharge price, low case<input id="sHiLo" type="number" step="1" value="100"></label>
+        <label for="sLoHi">Charge price, high case<input id="sLoHi" type="number" step="1" value="0"></label>
+        <label for="sHiHi">Discharge price, high case<input id="sHiHi" type="number" step="1" value="200"></label>
+        <span class="fieldset-title">Autumn/winter · 183 days</span>
+        <label for="wLoLo">Charge price, low case<input id="wLoLo" type="number" step="1" value="100"></label>
+        <label for="wHiLo">Discharge price, low case<input id="wHiLo" type="number" step="1" value="150"></label>
+        <label for="wLoHi">Charge price, high case<input id="wLoHi" type="number" step="1" value="100"></label>
+        <label for="wHiHi">Discharge price, high case<input id="wHiHi" type="number" step="1" value="200"></label>
+        <span class="fieldset-title">Capex · default from Tetra Tech for the Energy Community, May 2025</span>
+        <label for="capex">Capex per MW (€, 2 h; study default)<input id="capex" type="number" step="10000" min="0" value="1000000"></label>
+        <label for="opex">Opex per MW per year (€)<input id="opex" type="number" step="500" min="0" placeholder="optional"></label>
+      </div>
+    </div>
+    <div class="panel result" id="result"></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Grid backbone</span><h2>400 kV links that change the picture</h2></div>
+  <div class="tl">
+    <div class="panel item"><span class="state on">In service</span><h3>Isaccea (RO) – Vulcănești</h3><span class="yr">400 kV · existing</span><p class="label-note">Until this month it was the only 400 kV link to Romania. <a href="#src-watchdog">WatchDog.MD</a></p></div>
+    <div class="panel item"><span class="state on">Energized 8 Nov 2026</span><h3>Vulcănești – Chișinău</h3><span class="yr">400 kV · 158 km</span><p class="label-note">Brings the Romanian link up to the capital's substation. <a href="#src-ri">Romania Insider</a></p></div>
+    <div class="panel item"><span class="state plan">Planned 2027</span><h3>Bălți – Suceava (RO)</h3><span class="yr">400 kV</span><p class="label-note">A second link, into the north. <a href="#src-ies">IEŚ</a></p></div>
+    <div class="panel item"><span class="state plan">Planned 2029</span><h3>Strășeni – Gutinaș (RO)</h3><span class="yr">400 kV · US co-financed, $130m</span><p class="label-note"><a href="#src-ies">IEŚ</a></p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Quality</span><h2>What this scan cannot see yet</h2></div>
+  <div class="gaps">
+    <div class="panel gap"><b>Distribution permits are missing</b><span>The register covers permits issued by Moldelectrica only. Premier Energy Distribution had issued 329 MW and RED Nord 96.4 MW (Jul 2025), with no breakdown by location. <a href="#src-gov">Ministry of Energy</a></span></div>
+    <div class="panel gap"><b>A permit is not a project</b><span>Moldelectrica had issued about 1,500 MW of permits by Feb 2025, and under 10% get built each year. Read high scores as pressure, not certainty. <a href="#src-gov">Ministry of Energy</a></span></div>
+    <div class="panel gap"><b>No hourly prices</b><span>OPEM's results pages could not be reached from here, so price spread is the reported seasonal range, not a backtest. The next step is to ingest OPEM or ENTSO-E MD prices.</span></div>
+    <div class="panel gap"><b>No hosting capacity by node</b><span>Unlike Denmark, there is no public free/limited/no-capacity map. Closeness to the backbone is a stand-in for grid strength, measured in straight-line km from the district seat.</span></div>
+    <div class="panel gap"><b>The Transnistrian flag is a text rule</b><span>A permit is flagged when its connection point names MGRES, CERS Moldovenească, Bender or Rîbnița. It does not say whether the line works today. Only Moldelectrica can say that.</span></div>
+    <div class="panel gap"><b>Positions are approximate</b><span>Each district is drawn at its seat town. Nodes in the Transnistrian region (MGRES, Rîbnița) are shown but left out of the closeness score.</span></div>
+    <div class="panel gap"><b>Storage figures disagree</b><span>One source gives 150 MW installed (Jun 2026). Another gives about 30 systems totalling about 150 MWh (Aug 2026). Both are shown as published. <a href="#src-infomarket">InfoMarket</a></span></div>
+  </div>
+</section>
+
+<section class="sources">
+  <div class="sec-head"><span class="eyebrow">Sources</span><h2>Where every number comes from</h2></div>
+  <div class="panel" style="padding:16px 18px"><ol>
+    <li id="src-reg"><a href="https://rdp.moldelectrica.md/files/docs/14/Registrul%20de%20evidenta%20AR_14.08.2026.pdf" target="_blank" rel="noopener">Moldelectrica, Registrul de evidență a avizelor de racordare, 14.08.2026</a>: all district features</li>
+    <li id="src-watchdog"><a href="https://watchdog.md/wp-content/uploads/2026/07/Research-on-renewable-energy-in-Moldova-WatchDog.MD_.pdf" target="_blank" rel="noopener">WatchDog.MD, Research on renewable energy in Moldova (Jun 2026)</a>: capacity, deficit, storage, price shapes</li>
+    <li id="src-anre"><a href="https://anre.md/storage/upload/administration/reports/1656/MP%20trim%20II%202026.pdf" target="_blank" rel="noopener">ANRE, market monitoring Q2 2026</a>: supply mix</li>
+    <li id="src-invest"><a href="https://www.investenergy.ro/record-pe-pzu-republica-moldova-7-428-mwh-tranzactionati-pentru-2-octombrie-maximul-primului-an-de-functionare/" target="_blank" rel="noopener">InvesTenergy, PZU Moldova record for 2 Oct 2026</a></li>
+    <li id="src-realitatea"><a href="https://realitatea.md/moldova-a-procurat-energie-electrica-mai-scumpa-in-octombrie-cat-a-costat/" target="_blank" rel="noopener">Realitatea.md, Energocom purchases in October 2026</a></li>
+    <li id="src-ri"><a href="https://www.romania-insider.com/republic-moldova-powers-up-new-electricity-link-romania" target="_blank" rel="noopener">Romania Insider, Vulcănești–Chișinău line energized</a></li>
+    <li id="src-ies"><a href="https://ies.lublin.pl/en/comments/the-price-of-security-moldovas-electricity-market-in-2025/" target="_blank" rel="noopener">IEŚ, The price of security: Moldova's electricity market in 2025</a>: interconnector timeline</li>
+    <li id="src-gov"><a href="https://energie.gov.md/ro/content/30-de-avize-de-racordare-la-retea-cu-o-capacitate-totala-de-peste-109-mw-au-fost-returnate" target="_blank" rel="noopener">Ministry of Energy, returned connection permits (Jul 2025)</a></li>
+    <li id="src-infomarket"><a href="https://www.infomarket.md/en/news/the-region-s-energy-shortage-has-reached-moldova-batteries-will-solve-only-part-of-the-problem" target="_blank" rel="noopener">InfoMarket, regional shortage and batteries (Aug 2026)</a></li>
+    <li id="src-tyndp"><a href="https://moldelectrica.md/files/docs/TYNDP_EN.pdf" target="_blank" rel="noopener">Moldelectrica, Transmission Network Development Plan 2018–2027</a>: substation voltages</li>
+  </ol></div>
+  <p class="foot">This is not investment advice. Outline: Natural Earth via world-atlas. Scores are relative across districts and change with the weights.</p>
+</section>
+</div>
+
+<script>
+const DATA = __DATA__;
+const $ = s => document.querySelector(s);
+const fmt = (n,d=0) => n.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d});
+const TODAY = '2026-11-12';
+const SVGNS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs={}, parent) => { const e=document.createElementNS(SVGNS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; };
+
+/* ---- price shape bars ---- */
+function shape(id, bands){
+  const s=$(id), x0=90, x1=350, max=220, X=v=>x0+(v/max)*(x1-x0);
+  [0,50,100,150,200].forEach(v=>{ el('line',{x1:X(v),x2:X(v),y1:14,y2:134,stroke:'var(--line)','stroke-width':1},s);
+    const t=el('text',{x:X(v),y:152,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},s); t.textContent=v; });
+  const t=el('text',{x:x1,y:167,'text-anchor':'end','font-size':10.5,fill:'var(--muted)'},s); t.textContent='€/MWh';
+  bands.forEach((b,i)=>{ const y=30+i*52;
+    const l=el('text',{x:0,y:y+15,'font-size':12.5,fill:'var(--ink)'},s); l.textContent=b.label;
+    el('rect',{x:X(b.lo),y:y,width:Math.max(4,X(b.hi)-X(b.lo)),height:22,rx:3,fill:b.color},s);
+    const v=el('text',{x:X(b.hi)+6,y:y+15,'font-size':11.5,fill:'var(--muted)','font-family':'IBM Plex Mono, monospace'},s); v.textContent=b.lo===b.hi?`~${b.lo}`:`${b.lo}–${b.hi}`;
+  });
+}
+shape('#shapeSummer',[{label:'Midday',lo:0,hi:25,color:'var(--solar)'},{label:'Peak',lo:100,hi:200,color:'var(--accent)'}]);
+shape('#shapeWinter',[{label:'Off-peak',lo:99,hi:101,color:'var(--muted)'},{label:'Peak',lo:150,hi:200,color:'var(--accent)'}]);
+
+/* ---- district features ---- */
+const R = 6371, rad = d => d*Math.PI/180;
+const hav = (a,b) => { const dLa=rad(b[0]-a[0]), dLo=rad(b[1]-a[1]); const h=Math.sin(dLa/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+const rightBank = DATA.nodes.filter(n=>!['mgr','rib'].includes(n.id));
+const dist = {};
+DATA.rows.forEach(r=>{
+  const d = dist[r.district] ??= {key:r.district, ...DATA.districts[r.district], rows:[], mw:0, solar:0, wind:0, storageMW:0, thermal:0, vreNoStore:0, vre:0};
+  r.lb = /MGRES|CERS Moldoveneasca|Bender|Ribnita/.test(r.point);
+  d.rows.push(r); d.mw += r.mw; d.lbMW = (d.lbMW||0) + (r.lb ? r.mw : 0);
+  const kinds = [r.solar&&'solar', r.wind&&'wind', r.thermal&&'thermal'].filter(Boolean);
+  const share = kinds.length ? r.mw/kinds.length : 0;   // mixed permits split evenly across their generation types, for the mix bar only
+  kinds.forEach(k=>d[k]+=share);
+  if(!kinds.length && r.storage) d.storageMW += r.mw;  // pure storage permits
+  if(r.storage && kinds.length) d.storageMW += 0;      // co-located storage size is not stated in the register
+  if(r.solar||r.wind){ d.vre += r.mw; if(!r.storage) d.vreNoStore += r.mw; }
+});
+const D = Object.values(dist);
+D.forEach(d=>{ let best=null; rightBank.forEach(n=>{ const k=hav(d.ll,n.ll); if(!best||k<best.km) best={km:k,node:n}; }); d.nearest=best; d.coLocated=d.rows.filter(r=>r.storage&&(r.solar||r.wind)).length; d.expired=d.rows.filter(r=>r.expiry<TODAY).length; });
+const pct = (arr, v, inverse=false) => { // percentile rank 0..1, ties averaged
+  const below=arr.filter(x=>inverse? x>v : x<v).length, eq=arr.filter(x=>x===v).length; return (below+ (eq-1)/2)/(arr.length-1); };
+function score(){
+  const w=[+$('#w1').value,+$('#w2').value,+$('#w3').value], sw=w.reduce((a,b)=>a+b,0)||1;
+  const mws=D.map(d=>d.mw), gaps=D.map(d=>d.vreNoStore), kms=D.map(d=>d.nearest.km);
+  D.forEach(d=>{ d.p=[pct(mws,d.mw), pct(gaps,d.vreNoStore), pct(kms,d.nearest.km,true)]; d.score=100*(d.p[0]*w[0]+d.p[1]*w[1]+d.p[2]*w[2])/sw; d.fits=fits(d); });
+  D.sort((a,b)=>b.score-a.score||b.mw-a.mw);
+}
+/* Opportunity rules, applied in order; a district can match several */
+function fits(d){
+  const f=[];
+  if(d.vre>=20 && d.vreNoStore>=10) f.push({c:'bess',t:'BESS beside renewables',why:`${fmt(d.vreNoStore,1)} MW of solar/wind permits here have no storage attached, so a co-located battery could absorb midday or windy-hour surplus.`});
+  if(d.nearest.km<=15) f.push({c:'node',t:'Grid-scale BESS',why:`The seat is ${fmt(d.nearest.km,0)} km from the ${d.nearest.node.name} ${d.nearest.node.kv} kV node, a strong point for a balancing battery (aFRR/mFRR) and peak shaving.`});
+  if(d.solar>=10) f.push({c:'load',t:'Daytime flexible load',why:`${fmt(d.solar,1)} MW of solar is queued. Load that can shift into 10:00–17:00 would buy at the low midday prices.`});
+  if(!f.length) f.push({c:'watch',t:'Watch',why:'Too little is queued here to point to a clear asset. Keep it on the watch list.'});
+  return f;
+}
+/* ---- ramp ---- */
+const rampVar = s => s>=75?'var(--ramp3)':s>=50?'var(--ramp2)':s>=25?'var(--ramp1)':'var(--ramp0)';
+
+/* ---- map ---- */
+const map=$('#map'); map.setAttribute('viewBox','-50 0 600 690');
+el('path',{d:DATA.outline,fill:'var(--accent-soft)',stroke:'var(--muted)','stroke-width':1.1,'stroke-linejoin':'round'},map);
+const N = Object.fromEntries(DATA.nodes.map(n=>[n.id,n.xy]));
+const link=(a,b,dash,label,anchor)=>{ el('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'var(--accent)','stroke-width':3,'stroke-dasharray':dash?'7 6':'none','stroke-linecap':'round',opacity:.9},map);
+  if(label){ const t=el('text',{x:b[0]+(anchor==='below'?-4:6),y:b[1]+(anchor==='below'?18:4),'font-size':12,'text-anchor':'start',fill:'var(--muted)'},map); t.textContent=label; el('circle',{cx:b[0],cy:b[1],r:3.5,fill:'var(--accent)'},map);} };
+link(N.vul,DATA.ext.isa,false,'Isaccea (RO)');
+link(N.vul,N.chi,false);
+link(N.bal,DATA.ext.suc,true,'Suceava (RO) 2027','below');
+link(N.str,DATA.ext.gut,true,'Gutinaș (RO) 2029','below');
+DATA.nodes.forEach(n=>{ const g=el('g',{},map); const left=['mgr','rib'].includes(n.id);
+  el('rect',{x:n.xy[0]-5,y:n.xy[1]-5,width:10,height:10,transform:`rotate(45 ${n.xy[0]} ${n.xy[1]})`,fill:left?'var(--muted)':'var(--ink)'},g);
+  const t=el('text',{x:n.xy[0]+9,y:n.xy[1]-7,'font-size':11.5,'font-weight':600,fill:left?'var(--muted)':'var(--ink)'},g); t.textContent=n.name; });
+const dotLayer=el('g',{},map), labelLayer=el('g',{'pointer-events':'none'},map);
+let selected=null;
+function drawMap(){
+  dotLayer.innerHTML=''; labelLayer.innerHTML='';
+  [...D].sort((a,b)=>b.mw-a.mw).forEach(d=>{
+    const r=4+Math.sqrt(d.mw)*1.7;
+    const c=el('circle',{cx:d.xy[0],cy:d.xy[1],r,fill:rampVar(d.score),'fill-opacity':.88,stroke:d.key===selected?'var(--ink)':'var(--panel)','stroke-width':d.key===selected?3:1.5,class:'district-dot',tabindex:0,role:'button','aria-label':`${d.name}: score ${Math.round(d.score)}, ${fmt(d.mw,1)} MW permitted`},dotLayer);
+    const tt=el('title',{},c); tt.textContent=`${d.name} · ${fmt(d.mw,1)} MW · score ${Math.round(d.score)}`;
+    c.addEventListener('click',()=>select(d.key)); c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(d.key);}});
+    if((d.mw>=40&&!['Balti','Straseni','Chisinau'].includes(d.key))||d.key===selected){ const t=el('text',{x:d.xy[0],y:d.xy[1]+r+13,'text-anchor':'middle','font-size':12,'font-weight':600,fill:'var(--ink)',stroke:'var(--panel)','stroke-width':3,'paint-order':'stroke'},labelLayer); t.textContent=d.name; }
+  });
+}
+/* ---- ranking table ---- */
+function mixBar(d){ const tot=d.solar+d.wind+d.thermal+d.storageMW||1;
+  return `<span class="mix" title="solar ${fmt(d.solar,1)} · wind ${fmt(d.wind,1)} · storage-only ${fmt(d.storageMW,1)} · thermal ${fmt(d.thermal,1)} MW">${[['solar','--solar'],['wind','--wind'],['storageMW','--storage'],['thermal','--thermal']].map(([k,c])=>`<i style="width:${100*d[k]/tot}%;background:var(${c})"></i>`).join('')}</span>`; }
+function drawRank(){
+  $('#rankBody').innerHTML = D.filter(d=>!southOnly||d.region==='South').map(d=>`<tr tabindex="0" data-k="${d.key}" class="${d.key===selected?'sel':''}">
+    <td>${d.name}<div class="label-note">${d.region}</div></td>
+    <td><span class="scorebar"><i style="width:${Math.max(2,d.score*0.6)}px"></i><span class="num">${Math.round(d.score)}</span></span></td>
+    <td class="r num">${fmt(d.mw,1)}</td><td>${mixBar(d)}</td>
+    <td><span class="fit ${d.fits[0].c}">${d.fits[0].t}</span>${d.fits.length>1?` <span class="label-note">+${d.fits.length-1}</span>`:''}</td></tr>`).join('');
+  document.querySelectorAll('#rankBody tr').forEach(tr=>{ tr.addEventListener('click',()=>select(tr.dataset.k)); tr.addEventListener('keydown',e=>{if(e.key==='Enter'){select(tr.dataset.k);}}); });
+}
+/* ---- detail ---- */
+const tags = r => `${r.solar?'<span class="tag s">solar</span>':''}${r.wind?'<span class="tag w">wind</span>':''}${r.storage?'<span class="tag b">storage</span>':''}${r.thermal?'<span class="tag t">'+(r.type.startsWith('Motoare')?'gas engines':'CHP')+'</span>':''}${r.lb?'<span class="tag lb" title="Connection point names a substation in the Transnistrian region">via MGRES/Bender</span>':''}`;
+function drawDetail(){
+  const d=D.find(x=>x.key===selected); const rank=D.indexOf(d)+1;
+  const pv = p => `${Math.round(p*100)}th pct`;
+  $('#detail').innerHTML = `
+  <div class="dhead"><div><span class="eyebrow">District card · ${d.region} · rank ${rank} of ${D.length}</span><h2>${d.name}</h2></div>
+    <div class="result"><span class="big">${Math.round(d.score)}<small> / 100</small></span></div></div>
+  <div class="feats">
+    <div class="feat"><span class="label-note">Permitted MW queued</span><span class="v">${fmt(d.mw,1)} MW</span><span class="p">${d.rows.length} permit${d.rows.length>1?'s':''} · ${pv(d.p[0])}</span></div>
+    <div class="feat"><span class="label-note">Solar/wind MW without storage</span><span class="v">${fmt(d.vreNoStore,1)} MW</span><span class="p">of ${fmt(d.vre,1)} MW solar/wind · ${pv(d.p[1])}</span></div>
+    <div class="feat"><span class="label-note">Nearest 330/400 kV node</span><span class="v">${fmt(d.nearest.km,0)} km</span><span class="p">${d.nearest.node.name} · ${pv(d.p[2])}</span></div>
+    <div class="feat"><span class="label-note">Through MGRES or Bender lines</span><span class="v">${fmt(d.lbMW||0,1)} MW</span><span class="p">${d.mw?Math.round(100*(d.lbMW||0)/d.mw):0}% of permitted MW</span></div>
+    <div class="feat"><span class="label-note">Storage in the queue</span><span class="v">${fmt(d.storageMW,1)} MW</span><span class="p">standalone, plus ${d.coLocated} co-located permit${d.coLocated===1?'':'s'} of unstated size</span></div>
+  </div>
+  ${d.fits.map(f=>`<div class="why"><span class="fit ${f.c}">${f.t}</span> ${f.why}</div>`).join('')}
+  ${d.expired?`<p class="label-note"><span class="exp">${d.expired} permit${d.expired>1?'s':''} past expiry</span> on today's date. They are still counted, because the register predates their expiry and may since have been extended.</p>`:''}
+  <div class="tablewrap"><table class="permits"><thead><tr><th>#</th><th>Connection point</th><th>Type</th><th class="r">MW</th><th>Holder</th><th>Valid to</th></tr></thead><tbody>
+  ${[...d.rows].sort((a,b)=>b.mw-a.mw).map(r=>`<tr><td class="num">${r.nr}</td><td>${r.point}</td><td>${tags(r)}</td><td class="r num">${fmt(r.mw,1)}</td><td>${r.applicant}</td><td class="num ${r.expiry<TODAY?'exp':''}">${r.expiry}</td></tr>`).join('')}
+  </tbody></table></div>
+  <p class="label-note">Source: <a href="#src-reg">Moldelectrica permit register, 14 Aug 2026</a>. Permits are as filed; MW is the permitted connection capacity.</p>`;
+}
+let southOnly=false;
+function setFilter(s){ southOnly=s; $('#fAll').setAttribute('aria-pressed',String(!s)); $('#fSouth').setAttribute('aria-pressed',String(s)); if(s && D.find(d=>d.key===selected)?.region!=='South'){ selected=D.find(d=>d.region==='South').key; drawMap(); drawDetail(); } drawRank(); }
+function select(k){ selected=k; drawMap(); drawRank(); drawDetail(); }
+function refresh(){ ['1','2','3'].forEach(i=>$('#o'+i).textContent=$('#w'+i).value); score(); if(!selected) selected=D[0].key; drawMap(); drawRank(); drawDetail(); }
+['#w1','#w2','#w3'].forEach(s=>$(s).addEventListener('input',refresh));
+$('#fAll').addEventListener('click',()=>setFilter(false)); $('#fSouth').addEventListener('click',()=>setFilter(true));
+refresh();
+
+/* ---- calculator ---- */
+const ids=['dur','rte','sLoLo','sHiLo','sLoHi','sHiHi','wLoLo','wHiLo','wLoHi','wHiHi','capex','opex'];
+const DAYS={s:182,w:183};
+function margin(E,rte,pc,pd){ return E*pd - (E/rte)*pc; }   // one cycle: deliver E MWh, buy E/rte
+function calc(){
+  const v=Object.fromEntries(ids.map(i=>[i,parseFloat($('#'+i).value)]));
+  const E=v.dur, rte=Math.min(1,Math.max(0.5,(v.rte||85)/100));
+  const seas = (lo,hi,days) => Math.max(0,margin(E,rte,lo,hi))*days;  // battery stays idle on days the spread does not cover losses
+  const low = seas(v.sLoLo,v.sHiLo,DAYS.s)+seas(v.wLoLo,v.wHiLo,DAYS.w);
+  const high= seas(v.sLoHi,v.sHiHi,DAYS.s)+seas(v.wLoHi,v.wHiHi,DAYS.w);
+  const lo=Math.min(low,high), hi=Math.max(low,high), scale=Math.max(hi*1.15,1);
+  const opex=isFinite(v.opex)?v.opex:0;
+  let pay='';
+  if(isFinite(v.capex)&&v.capex>0){ const pb=x=> x-opex>0 ? v.capex/(x-opex) : Infinity;
+    const a=pb(hi), b=pb(lo); pay=`<tr><td>Simple payback</td><td class="r">${isFinite(a)?fmt(a,1):'never'} – ${isFinite(b)?fmt(b,1):'never'} yrs</td></tr>`; }
+  $('#result').innerHTML=`<span class="eyebrow">Arbitrage revenue, €/MW/year · ${E} h battery</span>
+    <span class="big">€${fmt(lo/1000,0)}k – €${fmt(hi/1000,0)}k</span>
+    <div class="rangebar" aria-hidden="true"><div class="track"></div><div class="fill" style="left:${100*lo/scale}%;width:${Math.max(1,100*(hi-lo)/scale)}%"></div></div>
+    <table class="brk">
+      <tr><td>Spring/summer, low → high</td><td class="r">€${fmt(seas(v.sLoLo,v.sHiLo,DAYS.s)/1000,1)}k → €${fmt(seas(v.sLoHi,v.sHiHi,DAYS.s)/1000,1)}k</td></tr>
+      <tr><td>Autumn/winter, low → high</td><td class="r">€${fmt(seas(v.wLoLo,v.wHiLo,DAYS.w)/1000,1)}k → €${fmt(seas(v.wLoHi,v.wHiHi,DAYS.w)/1000,1)}k</td></tr>
+      <tr><td>Energy delivered per year</td><td class="r">${fmt(E*365,0)} MWh/MW</td></tr>
+      ${pay}
+    </table>
+    <p class="label-note">One cycle per day; each cycle buys ${E}/${(rte).toFixed(2)} MWh and sells ${E} MWh. Spring/summer is dominated by the solar midday trough; in winter, losses at about 100 €/MWh off-peak eat much of the spread. Moldova is tendering 246 MW of balancing capacity (72 MW aFRR, 174 MW mFRR) that storage can bid into, and that revenue would come on top (<a href="https://www.ess-news.com/2025/04/10/moldova-to-tender-246-mw-of-colocated-battery-storage/" target="_blank" rel="noopener">ESS News</a>).</p>`;
+}
+ids.forEach(i=>$('#'+i).addEventListener('input',calc)); calc();
+</script>

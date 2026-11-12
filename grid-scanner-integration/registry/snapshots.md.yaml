@@ -1,0 +1,54 @@
+  # Moldova (draft country; docs/sources/md/). Moldova publishes no capacity map; the TSO's register of
+  # connection permits is the substation-level signal (docs/sources/md/moldelectrica-connection-permits.md).
+  # Each edition is a new PDF file name, so one edition is captured here to put its bytes in the raw store
+  # (the claims file and the parser fixture need them) and the index page is to be found.
+  - id: md.moldelectrica.connection_permits.edition_2026_08_14
+    url: "https://rdp.moldelectrica.md/files/docs/14/Registrul%20de%20evidenta%20AR_14.08.2026.pdf"
+    kind: pdf
+    render: http
+    schedule: "0 6 * * 1"
+    timezone: Europe/Chisinau
+    on_change: research
+    owner: misi
+    status: active
+    note: >-
+      Edition 14.08.2026 (78 permits, 1,175.9 MW). Earlier edition seen at
+      mail.moldelectrica.md/files/docs/14/Registrul de evidenta AR_09.02.2026.pdf, so editions look half-yearly.
+      Not fetchable from the factory sandbox (proxy 403); the runtime capture is the first copy we hold.
+  - id: md.moldelectrica.connection_permits.page
+    url: null
+    kind: web_page
+    render: http
+    schedule: "0 6 * * 1"
+    timezone: Europe/Chisinau
+    on_change: research
+    owner: misi
+    status: to_research
+    note: >-
+      The Moldelectrica page that links the current register edition (files/docs/14/). Once found, watch it
+      so a new edition files a research bead, and later a parse:moldelectrica_permits parser (ADR 0009).
+  - id: md.moldelectrica.imbalance_prices
+    url: https://moldelectrica.md/en/electricity/dis_prices
+    kind: web_page
+    render: http
+    normalise: visible_text
+    schedule: "0 7 * * *"
+    timezone: Europe/Chisinau
+    on_change: research
+    owner: misi
+    status: active
+    note: >-
+      Monthly imbalance-price publications (latest listed on 2026-11-12: November 2025, published 20.01.2026).
+      The page lists months and dates; the figures sit in linked files not yet inspected.
+  - id: md.opem.dam_results
+    url: null
+    kind: web_page
+    render: http
+    schedule: "0 14 * * *"
+    timezone: Europe/Chisinau
+    on_change: research
+    owner: misi
+    status: to_research
+    note: >-
+      OPEM day-ahead results (PZU-MD), live since December 2025. opem.md was not reachable from the factory
+      sandbox; find the results page or a file export, then decide between a snapshot and an adapter.

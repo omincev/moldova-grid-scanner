@@ -1,0 +1,68 @@
+# Draft market rules for Moldova. Owner: to be named. Nothing here is verified against a primary legal
+# text yet: each rule cites the secondary source it was read from (2026-11-12) and stays verified: false
+# until the owner checks it against ANRE decisions or the Government decision.
+#
+# Keys outside the README vocabulary (proposed extension, needs the owner's sign-off):
+#   day_ahead.operator                 the NEMO running the national day-ahead market
+#   support_scheme.storage_requirement minimum storage attached to supported capacity, MWh per MW
+country: md
+owner: to_be_named
+rules:
+  - key: day_ahead.operator
+    zone: md.zone.md
+    value: OPEM
+    valid_from: 2025-12-01
+    valid_to: null
+    precision: month
+    source: >-
+      OPCOM press release 21.08.2026, "Record de tranzactionare pe PZU-MD": OPEM "launched the commercial
+      operation of short-term markets" in December 2025; designated NEMO by ANRE in 2025.
+      https://opcom.ro/opcom/uploads/doc/Comunicate/OPCOM_CP%20EN%2021.08.2026_Record%20de%20tranzactionare%20pe%20PZU-MD.pdf
+    verified: false
+    note: >-
+      The market is not coupled. Energocom bought 29.5% of its October 2026 volume on the Romanian
+      day-ahead market, so Romanian prices set much of the marginal price.
+  - key: balancing.products
+    zone: md.zone.md
+    value: [aFRR, mFRR]
+    valid_from: null
+    valid_to: null
+    precision: month
+    source: >-
+      ESS News 2025-04-10 (Ministry of Energy timeline): planned storage tender of 246 MW for balancing,
+      72 MW aFRR and 174 MW mFRR. https://www.ess-news.com/2025/04/10/moldova-to-tender-246-mw-of-colocated-battery-storage/
+    verified: false
+    note: >-
+      Start date of each product's market not established. Moldelectrica publishes monthly imbalance prices
+      (https://moldelectrica.md/en/electricity/dis_prices) but the figures were not readable from the page.
+  - key: connection.flexible_agreements
+    zone: md.zone.md
+    value: offered_by_tso
+    valid_from: 2026-01-01
+    valid_to: null
+    precision: month
+    source: >-
+      Moldelectrica register of connection permits, edition 14.08.2026: permits issued from 28.01.2026
+      onwards are marked as issued under flexible conditions ("condiții flexibile"), one under
+      "zero extragere" (no withdrawal).
+      https://rdp.moldelectrica.md/files/docs/14/Registrul%20de%20evidenta%20AR_14.08.2026.pdf
+    verified: false
+    note: >-
+      Read from the register's notes column, not from a legal text. The conditions themselves (curtailment
+      rules, compensation) are not published in the register; the legal basis (ANRE regulation) is to be
+      found. Directly relevant to BESS: a flexible permit may be curtailed or barred from withdrawing.
+  - key: support_scheme.storage_requirement
+    zone: md.zone.md
+    value: {min_mwh_per_mw: 0.25, applies_to: wind_auction}
+    valid_from: 2025-12-19
+    valid_to: null
+    precision: day
+    source: >-
+      Ministry of Energy, project status update 14.07.2026: wind + BESS auction (round 2), up to 170 MW,
+      at least 0.25 MWh of storage per MW, announced 19 Dec 2025.
+      https://energie.gov.md/sites/default/files/stadiul_proiectelorprogramelor_de_infrastructura_ale_men_-actualizare_14.07.2026.pdf
+    verified: false
+    note: >-
+      Interfax (2026-08-14) reports seven winning bids of 170 MW with 44 MW of BESS required. The ministry's
+      update gives about 22 MW / 44 MWh from preliminary modelling. Two winners hold permits in Ștefan Vodă
+      (Leafwind Energy, Navitas Energy) and one in Telenești (Lumina Noastra), per the permit register.

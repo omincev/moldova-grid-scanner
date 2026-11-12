@@ -1,0 +1,494 @@
+<title>Moldova Grid Scanner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: control-room sheet. System strip on top, then map + ranked districts side by side, then detail, calculator, gaps, sources. */
+:root{
+  --bg:#f2f4f3; --panel:#ffffff; --ink:#15211f; --muted:#5b6b67; --line:#d5dcd9;
+  --accent:#0b6e63; --accent-soft:#d8ece8;
+  --solar:#c98a12; --wind:#2f6fb0; --storage:#7a4fb5; --thermal:#8a6e5a;
+  --warn:#b4541a; --ok:#2c7a3f;
+  --ramp0:#e3efec; --ramp1:#9fcfc5; --ramp2:#3f9a8b; --ramp3:#0b5f55;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1615; --panel:#162120; --ink:#e3ebe8; --muted:#93a6a1; --line:#2a3a37;
+  --accent:#4cc1ae; --accent-soft:#183a35;
+  --solar:#e6ac3c; --wind:#6ea7e0; --storage:#a985dc; --thermal:#b89880;
+  --warn:#e98b52; --ok:#62b878;
+  --ramp0:#1f3431; --ramp1:#2b6b61; --ramp2:#3aa290; --ramp3:#7fe0cd; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1615; --panel:#162120; --ink:#e3ebe8; --muted:#93a6a1; --line:#2a3a37;
+  --accent:#4cc1ae; --accent-soft:#183a35;
+  --solar:#e6ac3c; --wind:#6ea7e0; --storage:#a985dc; --thermal:#b89880;
+  --warn:#e98b52; --ok:#62b878;
+  --ramp0:#1f3431; --ramp1:#2b6b61; --ramp2:#3aa290; --ramp3:#7fe0cd; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4vw,40px);font-weight:800}
+h2{font-size:21px;font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:68ch}
+header{display:flex;flex-direction:column;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.chip{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--panel);color:var(--muted)}
+.chip b{color:var(--ink);font-weight:500}
+section{display:flex;flex-direction:column;gap:14px}
+.sec-head{display:flex;flex-direction:column;gap:4px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .v{font-family:var(--f-display);font-size:26px;font-weight:700;line-height:1.1}
+.kpi .v small{font-size:14px;font-weight:500;color:var(--muted)}
+.kpi .l{font-size:13px}
+.kpi .s{font-size:11.5px;color:var(--muted)}
+.kpi .s a{color:var(--muted)}
+/* price shape */
+.shape{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.shape .panel{padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.shape svg{width:100%;height:auto;display:block}
+/* scanner */
+.scanner{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+.mapbox{padding:12px;position:relative}
+.mapbox>svg{width:100%;height:auto;display:block;max-height:760px}
+.legend svg{flex:none}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);padding:4px 6px 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:50%;display:inline-block}
+.ln{width:22px;height:0;border-top:2.5px solid var(--accent);display:inline-block}
+.ln.d{border-top-style:dashed}
+.ln.g{border-top-color:var(--muted)}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.weights{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) 120px 36px;gap:10px;align-items:center;font-size:13px}
+.wrow output{font-family:var(--f-mono);text-align:right;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.rank{padding:4px 0}
+.rank table{width:100%;border-collapse:collapse;font-size:13px}
+.rank th{font-weight:500;color:var(--muted);text-align:left;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--line)}
+.rank td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.rank tr:last-child td{border-bottom:0}
+.rank tbody tr{cursor:pointer}
+.rank tbody tr:hover td{background:var(--accent-soft)}
+.rank tbody tr.sel td{background:var(--accent-soft)}
+.rank tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.rank .r{text-align:right}
+.scorebar{display:flex;align-items:center;gap:8px}
+.scorebar i{display:block;height:6px;border-radius:3px;background:var(--accent)}
+.mix{display:flex;height:8px;width:90px;border-radius:2px;overflow:hidden;background:var(--line)}
+.mix i{display:block;height:100%}
+.fit{font-size:11.5px;border-radius:4px;padding:2px 7px;white-space:nowrap;border:1px solid currentColor;display:inline-block}
+.fit.bess{color:var(--storage)}
+.fit.node{color:var(--accent)}
+.fit.load{color:var(--solar)}
+.fit.watch{color:var(--muted)}
+.tablewrap{overflow-x:auto}
+/* detail */
+.detail{padding:18px;display:flex;flex-direction:column;gap:14px}
+.dhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:baseline}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.feat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.feat .v{font-family:var(--f-mono);font-size:18px}
+.feat .p{font-size:11.5px;color:var(--muted)}
+.why{font-size:13.5px;border-left:3px solid var(--accent);padding:6px 12px;background:var(--accent-soft);border-radius:0 6px 6px 0}
+.permits{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}
+.permits th{text-align:left;font-weight:500;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+.permits td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.permits .r{text-align:right}
+.tag{font-size:11px;border-radius:3px;padding:1px 5px;margin-right:3px;color:var(--panel);display:inline-block}
+.tag.s{background:var(--solar)} .tag.w{background:var(--wind)} .tag.b{background:var(--storage)} .tag.t{background:var(--thermal)}
+.exp{color:var(--warn);font-weight:600}
+/* calculator */
+.calc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.calc .panel{padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.fields input,.fields select{font-family:var(--f-mono);font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%}
+.fields input:focus-visible,.fields select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.fieldset-title{grid-column:1/-1;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);margin-top:4px}
+.result .big{font-family:var(--f-display);font-size:34px;font-weight:800;line-height:1.1}
+.result .big small{font-size:15px;color:var(--muted);font-weight:500}
+.rangebar{position:relative;height:30px;margin-top:6px}
+.rangebar .track{position:absolute;left:0;right:0;top:13px;height:4px;background:var(--line);border-radius:2px}
+.rangebar .fill{position:absolute;top:9px;height:12px;background:var(--accent);border-radius:3px;opacity:.85}
+.label-note{font-size:12px;color:var(--muted)}
+.brk{width:100%;border-collapse:collapse;font-size:13px}
+.brk td{padding:5px 0;border-bottom:1px dashed var(--line)}
+.brk td.r{text-align:right;font-family:var(--f-mono)}
+/* timeline */
+.tl{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.tl .item{padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tl .yr{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.state{font-size:11px;font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.06em}
+.state.on{color:var(--ok)} .state.plan{color:var(--warn)}
+/* gaps + sources */
+.gaps{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.gap{padding:12px 14px;font-size:13.5px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.gap b{font-weight:600}
+.sources ol{margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px;columns:1}
+.sources li{overflow-wrap:anywhere}
+.foot{font-size:12px;color:var(--muted)}
+svg text{font-family:var(--f-body)}
+.district-dot{cursor:pointer;transition:stroke-width .15s}
+.district-dot:focus-visible{outline:none;stroke:var(--ink);stroke-width:3}
+.south-kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.cands{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.cand{padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cand h3{font-size:17px}
+.cand dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;margin:0;font-size:13px}
+.cand dt{color:var(--muted)}
+.cand dd{margin:0;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.cand ul{margin:0;padding-left:18px;font-size:13.5px;display:flex;flex-direction:column;gap:4px}
+.cand .lbl{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase}
+.cand .lbl.ok{color:var(--ok)} .cand .lbl.risk{color:var(--warn)}
+.cand .next{font-size:13px;border-top:1px dashed var(--line);padding-top:8px}
+.verdict{padding:16px 18px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--warn);border-radius:0 10px 10px 0}
+.verdict p{max-width:80ch}
+.filters{display:flex;gap:6px;padding:10px 10px 6px}
+.filters button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.filters button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tag.lb{background:var(--warn)}
+@media (max-width:900px){.scanner,.calc,.shape{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.rank th:nth-child(4),.rank td:nth-child(4){display:none}}
+@media (max-width:480px){.fields{grid-template-columns:minmax(0,1fr)}.wrow{grid-template-columns:minmax(0,1fr) 90px 32px}.kpi .v{font-size:22px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">Grid opportunity scanner · Republic of Moldova · bidding zone MD</span>
+  <h1>Moldova Grid Scanner</h1>
+  <p class="lede">Where on Moldova's grid a flexible asset could make money, which asset fits, and roughly what a battery earns. Built the same way as the Danish scanner: public data only, every figure linked to its source, gaps left as gaps.</p>
+  <div class="chips">
+    <span class="chip">Snapshot <b>12 Nov 2026</b></span>
+    <span class="chip">Permit register <b>Moldelectrica, 14 Aug 2026</b></span>
+    <span class="chip">Hourly prices <b>not loaded</b></span>
+    <span class="chip">Hosting-capacity map <b>none published</b></span>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Zone card · MD</span><h2>The system in six numbers</h2></div>
+  <div class="kpis">
+    <div class="kpi"><span class="v">1,044 <small>MW</small></span><span class="l">Installed renewables, end Apr 2026</span><span class="s">PV 764 · wind 255 · <a href="#src-watchdog">WatchDog.MD</a></span></div>
+    <div class="kpi"><span class="v">48.8<small>%</small></span><span class="l">Supply imported from Romania, Q2 2026</span><span class="s">RES 36.7%, Ukraine 7.1%, CHP 7.0% · <a href="#src-anre">ANRE</a></span></div>
+    <div class="kpi"><span class="v">&gt;600 <small>MW</small></span><span class="l">Peak-hour deficit covered by imports</span><span class="s"><a href="#src-watchdog">WatchDog.MD</a>, Jun 2026</span></div>
+    <div class="kpi"><span class="v">150 <small>/ 600 MW</small></span><span class="l">Storage installed vs. ministry's stated need</span><span class="s">~200 MW expected by end 2026 · <a href="#src-watchdog">WatchDog.MD</a></span></div>
+    <div class="kpi"><span class="v">129 <small>€/MWh</small></span><span class="l">Day-ahead avg on record day (7,428 MWh, 2 Oct 2026)</span><span class="s">OPEM market, 21 participants · <a href="#src-invest">InvesTenergy</a></span></div>
+    <div class="kpi"><span class="v">195.9 <small>€/MWh</small></span><span class="l">Energocom weighted purchase price, Oct 2026</span><span class="s">Sep: 157.4 · 77% imported · <a href="#src-realitatea">Realitatea</a></span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Feature F1 · price spread (system level)</span><h2>Where the battery margin comes from</h2>
+  <p class="lede">Moldova buys a large share of its power on the Romanian day-ahead market, so the daily price shape follows Romania's. The bars show the price ranges reported for each season. They are reported ranges, not hourly data this page computed.</p></div>
+  <div class="shape">
+    <div class="panel"><h3>Spring and summer</h3><svg id="shapeSummer" viewBox="0 0 420 170" role="img" aria-label="Spring and summer price ranges: midday 0 to 25 euro per MWh, peak 100 to 200"></svg><span class="label-note">Midday (10:00–17:00 CET) 0–25 €/MWh, negative at times; peak 100–200 €/MWh. Source: <a href="#src-watchdog">WatchDog.MD</a>, p.17.</span></div>
+    <div class="panel"><h3>Autumn and winter</h3><svg id="shapeWinter" viewBox="0 0 420 170" role="img" aria-label="Autumn and winter price ranges: off-peak about 100 euro per MWh, peak 150 to 200"></svg><span class="label-note">Off-peak ~100 €/MWh; peak 150–200 €/MWh. Source: <a href="#src-watchdog">WatchDog.MD</a>, p.17.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Features F6 + F7 · district level</span><h2>Scan the districts</h2>
+  <p class="lede">Moldova publishes no substation capacity map like Denmark's. The closest public signal is Moldelectrica's register of active grid-connection permits: 78 permits, 1,176 MW, each tied to a substation or line. Districts are scored on how much is queued, how much of it is solar or wind with no storage attached, and how close they are to the 330/400 kV backbone. Select a district to see its permits.</p></div>
+  <div class="scanner">
+    <div class="panel mapbox">
+      <svg id="map" role="img" aria-label="Map of Moldova with districts sized by permitted MW"></svg>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--ramp3)"></span>higher score</span>
+        <span><span class="sw" style="background:var(--ramp0);border:1px solid var(--line)"></span>lower score</span>
+        <span>circle area = permitted MW</span>
+        <span><span class="ln"></span>400 kV in service</span>
+        <span><span class="ln d"></span>400 kV planned</span>
+        <span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" transform="rotate(45 6 6)" fill="var(--ink)"/></svg>330/400 kV node</span>
+      </div>
+    </div>
+    <div class="side">
+      <div class="panel weights">
+        <h3>Score weights</h3>
+        <div class="wrow"><label for="w1">Permitted MW queued</label><input id="w1" type="range" min="0" max="100" value="35"><output id="o1">35</output></div>
+        <div class="wrow"><label for="w2">Solar/wind MW without storage</label><input id="w2" type="range" min="0" max="100" value="40"><output id="o2">40</output></div>
+        <div class="wrow"><label for="w3">Closeness to 330/400 kV node</label><input id="w3" type="range" min="0" max="100" value="25"><output id="o3">25</output></div>
+        <p class="label-note">Each feature is turned into a percentile rank across the 26 districts with permits, then weighted and summed to a score from 0 to 100. This is the same method as the Danish congestion score.</p>
+      </div>
+      <div class="panel rank"><div class="filters" role="group" aria-label="Show districts"><button type="button" id="fAll" aria-pressed="true">All districts</button><button type="button" id="fSouth" aria-pressed="false">South only</button></div><div class="tablewrap"><table>
+        <thead><tr><th>District</th><th>Score</th><th class="r">MW</th><th>Mix</th><th>Fits</th></tr></thead>
+        <tbody id="rankBody"></tbody></table></div></div>
+    </div>
+  </div>
+  <div class="panel detail" id="detail" aria-live="polite"></div>
+</section>
+
+<section id="south">
+  <div class="sec-head"><span class="eyebrow">Use case · BESS in southern Moldova</span><h2>Can a battery work in the south?</h2>
+  <p class="lede">The south is where the permits are. It is also where many connections run through 110 kV lines that start at MGRES (the Cuciurgan plant in the Transnistrian region) or end in Bender. MGRES has not supplied the right bank since 1 January 2025. The figures below come from the permit register, edition 14 Aug 2026. "South" here means Ștefan Vodă, Căușeni, Cimișlia, Leova and Ceadîr-Lunga, the southern districts with permits. Cahul, Vulcănești, Comrat, Taraclia, Basarabeasca and Cantemir have none.</p></div>
+  <div class="kpis south-kpis">
+    <div class="kpi"><span class="v">539 <small>MW</small></span><span class="l">Permitted in the south</span><span class="s">26 permits, 46% of the national register, all solar or wind</span></div>
+    <div class="kpi"><span class="v">368 <small>MW</small></span><span class="l">Solar/wind with no storage attached</span><span class="s">The surplus a battery could absorb</span></div>
+    <div class="kpi"><span class="v">0 <small>MW</small></span><span class="l">Standalone storage queued in the south</span><span class="s">vs 84 MW elsewhere (50 at Bălți substation, 20 at Chișinău, others)</span></div>
+    <div class="kpi"><span class="v">346 <small>MW</small></span><span class="l">Connected through MGRES or Bender lines</span><span class="s">64% of the south's permitted MW (12 permits)</span></div>
+  </div>
+  <div class="cands">
+    <div class="panel cand">
+      <span class="lbl ok">Grid-scale BESS · first mover</span>
+      <h3>Vulcănești 400 kV node</h3>
+      <dl><dt>Grid</dt><dd>400 kV to Isaccea (RO) and to Chișinău (since 8 Nov 2026)</dd><dt>Works</dt><dd>400 kV extension ~94% (30 Jun 2026)</dd><dt>Queue nearby</dt><dd>0 MW in Cahul, Vulcănești, Comrat, Taraclia</dd></dl>
+      <ul><li>The strongest point in the south now that it has two 400 kV links, and nobody has a permit near it.</li><li>Suits a balancing battery (aFRR/mFRR) rather than one tied to a wind farm.</li><li>Not known: whether there is a 110 kV or MV level to connect to, and how much capacity is free.</li></ul>
+      <p class="next"><b>Next step:</b> ask Moldelectrica for connection options and capacity at Vulcănești, and the terms of a flexible permit.</p>
+    </div>
+    <div class="panel cand">
+      <span class="lbl risk">Co-located BESS · connection risk</span>
+      <h3>Ștefan Vodă wind cluster</h3>
+      <dl><dt>Permitted</dt><dd>328.9 MW, 18 permits</dd><dt>No storage</dt><dd>170.9 MW</dd><dt>Via MGRES lines</dt><dd>269.5 MW (82%)</dd><dt>Substations</dt><dd>Cioburciu, Caplani, Olănești, Purcari, Ștefan Vodă</dd></dl>
+      <ul><li>The largest renewable cluster in the country, and wind needs storage here.</li><li>Wind-auction winners Leafwind and Navitas hold permits here and must add at least 0.25 MWh per MW. They could be partners or competitors.</li><li>Most connections are taps on 110 kV lines from MGRES. If those lines can't carry power, a battery is stranded with them.</li></ul>
+      <p class="next"><b>Next step:</b> before any revenue case, get Moldelectrica's view on how secure the MGRES–Cioburciu, –Caplani and –Purcari lines are.</p>
+    </div>
+    <div class="panel cand">
+      <span class="lbl ok">Co-located BESS · cleaner grid path</span>
+      <h3>Cimișlia and western Căușeni</h3>
+      <dl><dt>Cimișlia</dt><dd>52.3 MW, 50 MW wind without storage, 0 via Transnistrian-region lines</dd><dt>Căușeni</dt><dd>146 MW wind, 0 storage; 76 MW via Vărnița–Bender, 70 MW via Taraclia Nord–Basarabeasca</dd></dl>
+      <ul><li>Gura Galbenei (50 MW, on the Chișinău–Gura Galbenei 110 kV line) and Taraclia (70 MW, Taraclia Nord–Basarabeasca) connect entirely on the right bank.</li><li>About 120 MW of wind with no storage and a clean path makes this the best co-location target.</li><li>The permits date from 2023 and have been extended to 2027–2028. Check whether the projects are still alive.</li></ul>
+      <p class="next"><b>Next step:</b> approach the GS Blue Energy (Gura Galbenei) and HPI Wind Alpha (Taraclia) projects about adding storage.</p>
+    </div>
+  </div>
+  <div class="panel verdict">
+    <h3>Feasibility in one paragraph</h3>
+    <p>The need is real. The south holds 368 MW of wind and solar with no storage, the system has an evening deficit of over 600 MW, and the Energy Community's study sizes 162 MW of upward reserve for about 1,261 MW of variable renewables. But arbitrage alone does not pay for a battery. At about €1M per MW for 2 hours (the study's capex), €38k–103k per MW per year of arbitrage means a simple payback of about 10–27 years. A southern battery works when it also earns balancing payments or is paid for by a wind project's storage obligation, and when it connects at Vulcănești or on a right-bank line. MGRES-dependent connections in Ștefan Vodă need clearing with Moldelectrica first.</p>
+    <p class="label-note">Sources: permit register (14 Aug 2026); <a href="https://energie.gov.md/sites/default/files/document/attachments/deliverable_4-_res_and_bess_integration_report_final.pdf" target="_blank" rel="noopener">Tetra Tech for the Energy Community Secretariat, May 2025</a>; <a href="https://energie.gov.md/sites/default/files/stadiul_proiectelorprogramelor_de_infrastructura_ale_men_-actualizare_14.07.2026.pdf" target="_blank" rel="noopener">Ministry of Energy project status, 14 Jul 2026</a>; <a href="https://www.old.ipn.md/en/cuciurgan-power-plant-stops-delivering-energy-to-the-right-bank-7966_1110346.html" target="_blank" rel="noopener">IPN on MGRES supply</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Return range v0 · BESS arbitrage</span><h2>What a battery could earn per MW</h2>
+  <p class="lede">This is an upper bound with perfect foresight: one full cycle a day, charging in the cheap window and discharging at the peak. The default prices are the seasonal ranges above. Balancing revenue (aFRR/mFRR), network tariffs, degradation and taxes are not included. Change any input.</p></div>
+  <div class="calc">
+    <div class="panel">
+      <div class="fields">
+        <label for="dur">Duration (hours)<select id="dur"><option value="1">1 h</option><option value="2" selected>2 h</option><option value="3">3 h</option><option value="4">4 h</option></select></label>
+        <label for="rte">Round-trip efficiency (%)<input id="rte" type="number" min="50" max="100" step="1" value="85"></label>
+        <span class="fieldset-title">Spring/summer · 182 days</span>
+        <label for="sLoLo">Charge price, low case (€/MWh)<input id="sLoLo" type="number" step="1" value="25"></label>
+        <label for="sHiLo">Discharge price, low case<input id="sHiLo" type="number" step="1" value="100"></label>
+        <label for="sLoHi">Charge price, high case<input id="sLoHi" type="number" step="1" value="0"></label>
+        <label for="sHiHi">Discharge price, high case<input id="sHiHi" type="number" step="1" value="200"></label>
+        <span class="fieldset-title">Autumn/winter · 183 days</span>
+        <label for="wLoLo">Charge price, low case<input id="wLoLo" type="number" step="1" value="100"></label>
+        <label for="wHiLo">Discharge price, low case<input id="wHiLo" type="number" step="1" value="150"></label>
+        <label for="wLoHi">Charge price, high case<input id="wLoHi" type="number" step="1" value="100"></label>
+        <label for="wHiHi">Discharge price, high case<input id="wHiHi" type="number" step="1" value="200"></label>
+        <span class="fieldset-title">Capex · default from Tetra Tech for the Energy Community, May 2025</span>
+        <label for="capex">Capex per MW (€, 2 h; study default)<input id="capex" type="number" step="10000" min="0" value="1000000"></label>
+        <label for="opex">Opex per MW per year (€)<input id="opex" type="number" step="500" min="0" placeholder="optional"></label>
+      </div>
+    </div>
+    <div class="panel result" id="result"></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Grid backbone</span><h2>400 kV links that change the picture</h2></div>
+  <div class="tl">
+    <div class="panel item"><span class="state on">In service</span><h3>Isaccea (RO) – Vulcănești</h3><span class="yr">400 kV · existing</span><p class="label-note">Until this month it was the only 400 kV link to Romania. <a href="#src-watchdog">WatchDog.MD</a></p></div>
+    <div class="panel item"><span class="state on">Energized 8 Nov 2026</span><h3>Vulcănești – Chișinău</h3><span class="yr">400 kV · 158 km</span><p class="label-note">Brings the Romanian link up to the capital's substation. <a href="#src-ri">Romania Insider</a></p></div>
+    <div class="panel item"><span class="state plan">Planned 2027</span><h3>Bălți – Suceava (RO)</h3><span class="yr">400 kV</span><p class="label-note">A second link, into the north. <a href="#src-ies">IEŚ</a></p></div>
+    <div class="panel item"><span class="state plan">Planned 2029</span><h3>Strășeni – Gutinaș (RO)</h3><span class="yr">400 kV · US co-financed, $130m</span><p class="label-note"><a href="#src-ies">IEŚ</a></p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="eyebrow">Quality</span><h2>What this scan cannot see yet</h2></div>
+  <div class="gaps">
+    <div class="panel gap"><b>Distribution permits are missing</b><span>The register covers permits issued by Moldelectrica only. Premier Energy Distribution had issued 329 MW and RED Nord 96.4 MW (Jul 2025), with no breakdown by location. <a href="#src-gov">Ministry of Energy</a></span></div>
+    <div class="panel gap"><b>A permit is not a project</b><span>Moldelectrica had issued about 1,500 MW of permits by Feb 2025, and under 10% get built each year. Read high scores as pressure, not certainty. <a href="#src-gov">Ministry of Energy</a></span></div>
+    <div class="panel gap"><b>No hourly prices</b><span>OPEM's results pages could not be reached from here, so price spread is the reported seasonal range, not a backtest. The next step is to ingest OPEM or ENTSO-E MD prices.</span></div>
+    <div class="panel gap"><b>No hosting capacity by node</b><span>Unlike Denmark, there is no public free/limited/no-capacity map. Closeness to the backbone is a stand-in for grid strength, measured in straight-line km from the district seat.</span></div>
+    <div class="panel gap"><b>The Transnistrian flag is a text rule</b><span>A permit is flagged when its connection point names MGRES, CERS Moldovenească, Bender or Rîbnița. It does not say whether the line works today. Only Moldelectrica can say that.</span></div>
+    <div class="panel gap"><b>Positions are approximate</b><span>Each district is drawn at its seat town. Nodes in the Transnistrian region (MGRES, Rîbnița) are shown but left out of the closeness score.</span></div>
+    <div class="panel gap"><b>Storage figures disagree</b><span>One source gives 150 MW installed (Jun 2026). Another gives about 30 systems totalling about 150 MWh (Aug 2026). Both are shown as published. <a href="#src-infomarket">InfoMarket</a></span></div>
+  </div>
+</section>
+
+<section class="sources">
+  <div class="sec-head"><span class="eyebrow">Sources</span><h2>Where every number comes from</h2></div>
+  <div class="panel" style="padding:16px 18px"><ol>
+    <li id="src-reg"><a href="https://rdp.moldelectrica.md/files/docs/14/Registrul%20de%20evidenta%20AR_14.08.2026.pdf" target="_blank" rel="noopener">Moldelectrica, Registrul de evidență a avizelor de racordare, 14.08.2026</a>: all district features</li>
+    <li id="src-watchdog"><a href="https://watchdog.md/wp-content/uploads/2026/07/Research-on-renewable-energy-in-Moldova-WatchDog.MD_.pdf" target="_blank" rel="noopener">WatchDog.MD, Research on renewable energy in Moldova (Jun 2026)</a>: capacity, deficit, storage, price shapes</li>
+    <li id="src-anre"><a href="https://anre.md/storage/upload/administration/reports/1656/MP%20trim%20II%202026.pdf" target="_blank" rel="noopener">ANRE, market monitoring Q2 2026</a>: supply mix</li>
+    <li id="src-invest"><a href="https://www.investenergy.ro/record-pe-pzu-republica-moldova-7-428-mwh-tranzactionati-pentru-2-octombrie-maximul-primului-an-de-functionare/" target="_blank" rel="noopener">InvesTenergy, PZU Moldova record for 2 Oct 2026</a></li>
+    <li id="src-realitatea"><a href="https://realitatea.md/moldova-a-procurat-energie-electrica-mai-scumpa-in-octombrie-cat-a-costat/" target="_blank" rel="noopener">Realitatea.md, Energocom purchases in October 2026</a></li>
+    <li id="src-ri"><a href="https://www.romania-insider.com/republic-moldova-powers-up-new-electricity-link-romania" target="_blank" rel="noopener">Romania Insider, Vulcănești–Chișinău line energized</a></li>
+    <li id="src-ies"><a href="https://ies.lublin.pl/en/comments/the-price-of-security-moldovas-electricity-market-in-2025/" target="_blank" rel="noopener">IEŚ, The price of security: Moldova's electricity market in 2025</a>: interconnector timeline</li>
+    <li id="src-gov"><a href="https://energie.gov.md/ro/content/30-de-avize-de-racordare-la-retea-cu-o-capacitate-totala-de-peste-109-mw-au-fost-returnate" target="_blank" rel="noopener">Ministry of Energy, returned connection permits (Jul 2025)</a></li>
+    <li id="src-infomarket"><a href="https://www.infomarket.md/en/news/the-region-s-energy-shortage-has-reached-moldova-batteries-will-solve-only-part-of-the-problem" target="_blank" rel="noopener">InfoMarket, regional shortage and batteries (Aug 2026)</a></li>
+    <li id="src-tyndp"><a href="https://moldelectrica.md/files/docs/TYNDP_EN.pdf" target="_blank" rel="noopener">Moldelectrica, Transmission Network Development Plan 2018–2027</a>: substation voltages</li>
+  </ol></div>
+  <p class="foot">This is not investment advice. Outline: Natural Earth via world-atlas. Scores are relative across districts and change with the weights.</p>
+</section>
+</div>
+
+<script>
+const DATA = {"rows":[{"nr":1,"issue":"15.02.2023","expiry":"2027-02-15","district":"Donduseni","name":"Dondușeni","point":"SE proprie, derivatie LEA 35 kV Donduseni - Maramonovca","kv":35,"sub":null,"type":"Solară/Stocare","mw":15,"applicant":"FLYDEV-5E SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":2,"issue":"14.03.2023","expiry":"2028-08-07","district":"Cimislia","name":"Cimișlia","point":"SE proprie, derivatie LEA 110 kV Chisinau-Gura Galbena","kv":110,"sub":null,"type":"Eoliană","mw":50,"applicant":"GS BLUE ENERGY SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":3,"issue":"14.04.2023","expiry":"2027-04-14","district":"Stefan Voda","name":"Ștefan Vodă","point":"celula noua 10 kV in SE Cioburciu 110/10 kV","kv":10,"sub":"Cioburciu","type":"Solară/Stocare","mw":3,"applicant":"An de An SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":4,"issue":"25.04.2023","expiry":"2027-04-25","district":"Soldanesti","name":"Șoldănești","point":"SE proprie, intrare-iesire LEA 110 kV Soldanesti-Ribnita","kv":110,"sub":null,"type":"Motoare cu ardere interna","mw":12,"applicant":"MOLDOVATRANSGAZ SRL","solar":false,"wind":false,"storage":false,"thermal":true},{"nr":5,"issue":"26.04.2023","expiry":"2027-04-26","district":"Stefan Voda","name":"Ștefan Vodă","point":"celula existenta 6 kV nr.2 din SE Caplani 110/10-6","kv":6,"sub":"Caplani","type":"Eoliană","mw":6,"applicant":"SC ELTEPROD SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":6,"issue":"24.05.2023","expiry":"2027-05-24","district":"Causeni","name":"Căușeni","point":"SE proprie, intrare-iesire LEA 110 kV Taraclia Nord - Basarabeasca","kv":110,"sub":null,"type":"Eoliană","mw":70,"applicant":"HPI WIND ALPHA","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":7,"issue":"07.06.2023","expiry":"2027-06-07","district":"Rezina","name":"Rezina","point":"SE proprie, derivatie LEA 110 kV Orhei - Ciniseuti","kv":110,"sub":null,"type":"Solară/Stocare","mw":50,"applicant":"MALISUN-ENERG SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":8,"issue":"11.08.2023","expiry":"2027-08-11","district":"Soldanesti","name":"Șoldănești","point":"SE proprie, derivatie LEA 35 kV Ghindesti - Cotiujeni","kv":35,"sub":null,"type":"Eoliană","mw":16,"applicant":"USBA SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":9,"issue":"11.08.2023","expiry":"2028-08-07","district":"Stefan Voda","name":"Ștefan Vodă","point":"celule existente 10 kV nr.5 si nr.6 din SE Stefan Voda 110/35/10 kV","kv":10,"sub":"Stefan Voda","type":"Eoliană","mw":8,"applicant":"Navitas Energy SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":10,"issue":"17.08.2023","expiry":"2028-08-07","district":"Stefan Voda","name":"Ștefan Vodă","point":"circuit dublu, intrare-iesire LEA 110 kV CERS Moldoveneasca - Rascaietii Noi","kv":110,"sub":null,"type":"Eoliană","mw":45,"applicant":"Windnova SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":11,"issue":"25.10.2023","expiry":"2027-10-25","district":"Soroca","name":"Soroca","point":"doua celule noi 10 kV in SE Soroca 110/35/10 kV","kv":10,"sub":"Soroca","type":"Solară/Stocare","mw":10,"applicant":"HPI WIND OMEGA SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":12,"issue":"25.10.2023","expiry":"2027-10-25","district":"Rezina","name":"Rezina","point":"celula existenta 10 kV in SE Rezina 110/10 kV","kv":10,"sub":"Rezina","type":"Eoliană","mw":6,"applicant":"DELTA GREEN ENERGY SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":13,"issue":"30.11.2023","expiry":"2027-11-30","district":"Singerei","name":"Sîngerei","point":"celula existenta 10 kV nr.42 din SE Selmas 110/10 kV","kv":10,"sub":"Selmas","type":"Solară/Stocare","mw":6,"applicant":"SERVICII ENERGETICE AVANSATE SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":14,"issue":"21.12.2023","expiry":"2027-12-21","district":"Soroca","name":"Soroca","point":"SE proprie, derivatie in LEA 35 kV Visoca - Badiceni","kv":35,"sub":null,"type":"Eoliană","mw":8,"applicant":"EDTRANS-GRUP SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":15,"issue":"13.03.2024","expiry":"2028-03-13","district":"Briceni","name":"Briceni","point":"celula noua 6 kV nr.5 din SE FZ Briceni 110/6 kV","kv":6,"sub":"FZ Briceni","type":"Eoliană","mw":6,"applicant":"IMPORTEX-TRANS SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":16,"issue":"21.03.2024","expiry":"2028-03-21","district":"Singerei","name":"Sîngerei","point":"doua celule noi 10 kV nr.8 si nr.25 din SE Selmas 110/10 kV","kv":10,"sub":"Selmas","type":"Solară","mw":8,"applicant":"CAPP STONE SRL","solar":true,"wind":false,"storage":false,"thermal":false},{"nr":17,"issue":"22.03.2024","expiry":"2028-03-22","district":"Singerei","name":"Sîngerei","point":"SE proprie, derivatie LEA 110 kV spre SE St. Purificare de la Alexandreni-2","kv":110,"sub":null,"type":"Solară/Stocare","mw":20,"applicant":"CONCOM SOLAR PROJECTS SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":18,"issue":"26.03.2024","expiry":"2028-03-26","district":"Stefan Voda","name":"Ștefan Vodă","point":"celula noua 35 kV nr.2 din SE Olanesti 110/35/10 kV","kv":35,"sub":"Olanesti","type":"Eoliană/Stocare","mw":6,"applicant":"DIMCOM SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":19,"issue":"16.04.2024","expiry":"2028-04-16","district":"Briceni","name":"Briceni","point":"celula noua 10 kV nr.18 din SE Lipcani 110/10 kV","kv":10,"sub":"Lipcani","type":"Eoliană","mw":6,"applicant":"SC AGRODENIDAN SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":20,"issue":"16.04.2024","expiry":"2028-04-16","district":"Briceni","name":"Briceni","point":"celula noua 10 kV nr.8 din SE Tetcani 110/10 kV","kv":10,"sub":"Tetcani","type":"Eoliană","mw":5.8,"applicant":"INVEST REGIONAL SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":21,"issue":"17.05.2024","expiry":"2027-05-17","district":"Glodeni","name":"Glodeni","point":"SE proprie, derivatie in LEA 35 kV Glodeni - Balatina","kv":35,"sub":null,"type":"Solară","mw":7,"applicant":"NORDENERGOCOM SRL","solar":true,"wind":false,"storage":false,"thermal":false},{"nr":22,"issue":"13.06.2024","expiry":"2027-06-13","district":"Orhei","name":"Orhei","point":"celula noua 10 kV nr.10 din SE Micauti 110/10 kV","kv":10,"sub":"Micauti","type":"Solară/Stocare","mw":4,"applicant":"SKY DAFIA ENERGY SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":23,"issue":"13.06.2024","expiry":"2028-06-13","district":"Ialoveni","name":"Ialoveni","point":"celula noua 10 kV nr.19 din SE Ialoveni 110/35/10 kV","kv":10,"sub":"Ialoveni","type":"Solară","mw":3.3,"applicant":"MARENVIT SRL","solar":true,"wind":false,"storage":false,"thermal":false},{"nr":24,"issue":"17.06.2024","expiry":"2027-06-17","district":"Orhei","name":"Orhei","point":"celula noua 10 kV nr.13 din SE Micauti 110/10 kV","kv":10,"sub":"Micauti","type":"Solară/Stocare","mw":1,"applicant":"CURENT MASTER SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":25,"issue":"10.07.2024","expiry":"2027-07-10","district":"Hincesti","name":"Hîncești","point":"celula noua 35 kV, barele colectoare nr.2, SE Hincesti 110/35/10 kV","kv":35,"sub":"Hincesti","type":"Eoliană","mw":6,"applicant":"VADO ECO FARM SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":26,"issue":"18.07.2024","expiry":"2028-07-18","district":"Balti","name":"Bălți","point":"ID-110 kV existenta din cadrul CET Nord","kv":110,"sub":"CET Nord","type":"Cogenerare/Stocare","mw":107.3,"applicant":"SA CET-Nord","solar":false,"wind":false,"storage":true,"thermal":true},{"nr":27,"issue":"18.07.2024","expiry":"2028-07-18","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES - Cioburciu 2","kv":110,"sub":null,"type":"Eoliană/Stocare","mw":35,"applicant":"NEW WIND ENERGY SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":28,"issue":"18.07.2024","expiry":"2028-07-18","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES - Cioburciu 1","kv":110,"sub":null,"type":"Eoliană","mw":40.5,"applicant":"ELTEPROD INVEST SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":29,"issue":"02.08.2024","expiry":"2028-08-02","district":"Hincesti","name":"Hîncești","point":"celula existenta 10 kV nr.5 din SE Cococeni 110/10-6","kv":10,"sub":"Cococeni","type":"Solară/Stocare","mw":2.5,"applicant":"NG-INVEST SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":30,"issue":"02.08.2024","expiry":"2027-08-02","district":"Hincesti","name":"Hîncești","point":"celula noua 6 kV nr.15 din SE Cococeni 110/10-6","kv":6,"sub":"Cococeni","type":"Solară/Stocare","mw":1,"applicant":"MAGIC HAMORNY SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":31,"issue":"02.08.2024","expiry":"2027-08-02","district":"Hincesti","name":"Hîncești","point":"celula existenta 10 kV nr.14 din SE Cococeni 110/10-6 kV","kv":10,"sub":"Cococeni","type":"Solară/Stocare","mw":1,"applicant":"GIDDAN WIND ENERGY SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":32,"issue":"02.08.2024","expiry":"2028-08-02","district":"Hincesti","name":"Hîncești","point":"celula 6 kV nr.18 din SE Cococeni 110/10-6 kV","kv":6,"sub":"Cococeni","type":"Solară/Stocare","mw":5,"applicant":"EDEN.ESTATE SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":33,"issue":"05.08.2024","expiry":"2027-08-05","district":"Leova","name":"Leova","point":"celula existenta 10 kV nr.8 din SE Iargara 110/10 kV","kv":10,"sub":"Iargara","type":"Solară/Stocare","mw":1,"applicant":"SUNPOWERINSTALL SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":34,"issue":"16.08.2024","expiry":"2026-08-16","district":"Leova","name":"Leova","point":"celula noua 10 kV nr.6 din SE Cneazevca 110/10 kV","kv":10,"sub":"Cneazevca","type":"Solară","mw":1,"applicant":"PANOURISOLAREPRO SRL","solar":true,"wind":false,"storage":false,"thermal":false},{"nr":35,"issue":"16.08.2024","expiry":"2027-08-16","district":"Hincesti","name":"Hîncești","point":"celula noua 10 kV nr.23 din SE Cococeni 110/10-6 kV","kv":10,"sub":"Cococeni","type":"Solară/Stocare","mw":2,"applicant":"ECOSUNTECH SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":36,"issue":"19.08.2024","expiry":"2027-08-19","district":"Straseni","name":"Strășeni","point":"celula noua 10 kV nr.9 din SE Telecentru 110/10 kV","kv":10,"sub":"Telecentru","type":"Solară/Stocare","mw":1,"applicant":"ECOSOLARTECH SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":37,"issue":"31.10.2024","expiry":"2026-10-31","district":"Causeni","name":"Căușeni","point":"SE proprie, derivatie in LEA 110 kV Varnita-Bender Centru","kv":110,"sub":null,"type":"Eoliană","mw":33,"applicant":"Prim Agroservice SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":38,"issue":"22.11.2024","expiry":"2026-11-22","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES-Caplani","kv":110,"sub":null,"type":"Eoliană","mw":4,"applicant":"Plagrisfam SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":39,"issue":"22.11.2024","expiry":"2026-11-22","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES-Caplani","kv":110,"sub":null,"type":"Eoliană","mw":4,"applicant":"USBA SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":40,"issue":"12.12.2024","expiry":"2026-12-12","district":"Stefan Voda","name":"Ștefan Vodă","point":"celula existenta 6 kV nr.4 din SE Purcari 110/6 kV","kv":6,"sub":"Purcari","type":"Solară","mw":0.4,"applicant":"RINOR-GRUP COM SRL","solar":true,"wind":false,"storage":false,"thermal":false},{"nr":41,"issue":"23.12.2024","expiry":"2028-08-07","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES-Caplani","kv":110,"sub":null,"type":"Eoliană","mw":19,"applicant":"AN-ENERGY GREEN SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":42,"issue":"27.02.2025","expiry":"2027-02-27","district":"Chisinau","name":"Chișinău","point":"celula noua 110 kV in SE Chisinau 330/110/35 kV","kv":110,"sub":"Chisinau","type":"Eoliană/Stocare","mw":30,"applicant":"HESTIA ENERGY SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":43,"issue":"28.02.2025","expiry":"2027-02-28","district":"Chisinau","name":"Chișinău","point":"celula noua 35 kV in SE Chisinau 330/110/35 kV","kv":35,"sub":"Chisinau","type":"Stocare","mw":20,"applicant":"ALECTRONA ENERGY SRL","solar":false,"wind":false,"storage":true,"thermal":false},{"nr":44,"issue":"17.03.2025","expiry":"2027-03-17","district":"Causeni","name":"Căușeni","point":"SE proprie, derivatie in LEA 110 kV Varnita-Bender Centru","kv":110,"sub":null,"type":"Eoliană","mw":43,"applicant":"NANOWIND SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":45,"issue":"16.05.2025","expiry":"2027-05-16","district":"Ungheni","name":"Ungheni","point":"SE proprie, derivatie in LEA 35 kV Cioropcanii Noi - Gherman","kv":35,"sub":null,"type":"Eoliană/Stocare","mw":4,"applicant":"RICH EARTH ENERGY SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":46,"issue":"16.05.2025","expiry":"2027-05-16","district":"Ungheni","name":"Ungheni","point":"SE proprie, derivatie in LEA 35 kV Cioropcanii Noi - Gherman","kv":35,"sub":null,"type":"Eoliană/Stocare","mw":3,"applicant":"PUREWATT ENERGY SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":47,"issue":"20.05.2025","expiry":"2027-05-20","district":"Falesti","name":"Fălești","point":"SE proprie, derivatie in LEA 35 kV Falesti - FZ Falesti 1","kv":35,"sub":null,"type":"Solară/Stocare","mw":2,"applicant":"AFFLUENT ENERGY SOLUTIONS SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":48,"issue":"30.05.2025","expiry":"2027-05-30","district":"Nisporeni","name":"Nisporeni","point":"celula 10 kV nr.8 din SE Bolduresti 110/10 kV","kv":10,"sub":"Bolduresti","type":"Solară/Stocare","mw":3,"applicant":"ECOSPARK ENERGY SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":49,"issue":"30.05.2025","expiry":"2027-05-30","district":"Falesti","name":"Fălești","point":"SE proprie, derivatie in LEA 35 kV Falesti - FZ Falesti 1","kv":35,"sub":null,"type":"Solară/Eoliană/Stocare","mw":3,"applicant":"Greenflow Solutions SRL","solar":true,"wind":true,"storage":true,"thermal":false},{"nr":50,"issue":"03.06.2025","expiry":"2027-06-03","district":"Falesti","name":"Fălești","point":"celula 10 kV nr.18 din SE Risipeni 110/10 kV","kv":10,"sub":"Risipeni","type":"Eoliană/Stocare","mw":2,"applicant":"Natureforce Renewables SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":51,"issue":"30.05.2025","expiry":"2027-05-30","district":"Falesti","name":"Fălești","point":"SE proprie, derivatie in LEA 35 kV Falesti - FZ Falesti 1","kv":35,"sub":null,"type":"Solară/Stocare","mw":3,"applicant":"ECO RICH POWER SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":52,"issue":"02.06.2025","expiry":"2027-06-02","district":"Falesti","name":"Fălești","point":"SE proprie, derivatie in LEA 35 kV Falesti - FZ Falesti 1","kv":35,"sub":null,"type":"Eoliană/Stocare","mw":3,"applicant":"Ecopulse Power SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":53,"issue":"25.06.2025","expiry":"2027-06-25","district":"Falesti","name":"Fălești","point":"celula 10 kV nr.9 din SE Risipeni 110/10 kV","kv":10,"sub":"Risipeni","type":"Eoliană/Stocare","mw":2,"applicant":"Greenwave Energies SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":54,"issue":"22.07.2025","expiry":"2027-07-22","district":"Falesti","name":"Fălești","point":"SE proprie, derivatie in LEA 35 kV Falesti - FZ Falesti 2","kv":35,"sub":null,"type":"Solară/Stocare","mw":1,"applicant":"Ecoharvest Power SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":55,"issue":"08.09.2025","expiry":"2027-09-08","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES - Caplani","kv":110,"sub":null,"type":"Eoliană","mw":8,"applicant":"AN-ENERGY GREEN SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":56,"issue":"23.09.2025","expiry":"2027-09-23","district":"Rezina","name":"Rezina","point":"SE proprie, derivatie in LEA 35 kV Saharna - Vihvatinti","kv":35,"sub":null,"type":"Eoliană/Stocare","mw":5,"applicant":"HELIOS POWER SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":57,"issue":"28.01.2026","expiry":"2028-01-28","district":"Stefan Voda","name":"Ștefan Vodă","point":"celula noua 10 kV nr.14 din SE Cioburciu 110/10 kV","kv":10,"sub":"Cioburciu","type":"Eoliană","mw":8,"applicant":"BELUGA INVEST SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":58,"issue":"23.12.2025","expiry":"2027-12-23","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES - Cioburciu 2","kv":110,"sub":null,"type":"Eoliană/Stocare","mw":37,"applicant":"LEAFWIND ENERGY SRL","solar":false,"wind":true,"storage":true,"thermal":false},{"nr":59,"issue":"05.02.2026","expiry":"2028-02-05","district":"Stefan Voda","name":"Ștefan Vodă","point":"celule 6 kV din SE Purcari 110/6 kV","kv":6,"sub":"Purcari","type":"Eoliană","mw":16,"applicant":"BRATARA SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":60,"issue":"30.03.2026","expiry":"2028-03-30","district":"Telenesti","name":"Telenești","point":"SE proprie, derivatie in LEA 110 kV Ciocilteni-Brinzenii Noi","kv":110,"sub":null,"type":"Solară/Eoliană/Stocare","mw":64.9,"applicant":"LUMINA NOASTRA SRL","solar":true,"wind":true,"storage":true,"thermal":false},{"nr":61,"issue":"30.03.2026","expiry":"2028-03-30","district":"Straseni","name":"Strășeni","point":"SE proprie, derivatie in LEA 110 kV Straseni-Peresecina","kv":110,"sub":null,"type":"Solară/Eoliană/Stocare","mw":68,"applicant":"GS BLUE ELECTRIC SRL","solar":true,"wind":true,"storage":true,"thermal":false},{"nr":62,"issue":"15.05.2026","expiry":"2030-05-15","district":"Stefan Voda","name":"Ștefan Vodă","point":"doua celule 10 kV in SE Stefan Voda 110/35/10 kV","kv":10,"sub":"Stefan Voda","type":"Eoliană","mw":12,"applicant":"BASVENT SRL","solar":false,"wind":true,"storage":false,"thermal":false},{"nr":63,"issue":"10.02.2026","expiry":"2028-02-10","district":"Drochia","name":"Drochia","point":"celula existenta 10 kV nr.13 din SE Suri 110/10 kV","kv":10,"sub":"Suri","type":"Solară/Stocare","mw":1,"applicant":"BOMI AGRO INVEST SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":64,"issue":"17.03.2026","expiry":"2028-03-17","district":"Straseni","name":"Strășeni","point":"doua celule existente 10 kV nr.14 si nr.47 din SE Holodmas 110/10 kV","kv":10,"sub":"Holodmas","type":"Solară/Stocare","mw":14,"applicant":"ENERGY CAPITAL SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":65,"issue":"24.03.2026","expiry":"2028-03-24","district":"Straseni","name":"Strășeni","point":"celula noua 10 kV nr.4 din SE Micauti 110/10 kV","kv":10,"sub":"Micauti","type":"Solară/Stocare","mw":0.7,"applicant":"I-EDINA SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":66,"issue":"31.03.2026","expiry":"2028-03-31","district":"Telenesti","name":"Telenești","point":"celula 10 kV nr.8 din SE Brinzenii Noi 110/35/10 kV","kv":10,"sub":"Brinzenii Noi","type":"Solară/Stocare","mw":1.5,"applicant":"MODESOL SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":67,"issue":"15.05.2026","expiry":"2029-05-15","district":"Floresti","name":"Florești","point":"celula 10 kV in SE Floresti 110/35/10 kV","kv":10,"sub":"Floresti","type":"Stocare","mw":5,"applicant":"FLYDEV-13M SRL","solar":false,"wind":false,"storage":true,"thermal":false},{"nr":68,"issue":"19.05.2026","expiry":"2029-05-19","district":"Ceadir-Lunga","name":"Ceadîr-Lunga","point":"celula 10 kV in SE Ceadir-Lunga 110/10 kV","kv":10,"sub":"Ceadir-Lunga","type":"Solară/Stocare","mw":10,"applicant":"TRANSTEST SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":69,"issue":"07.04.2026","expiry":"2028-04-07","district":"Straseni","name":"Strășeni","point":"celula 10 kV din SE Greblesti 110/10 kV","kv":10,"sub":"Greblesti","type":"Solară/Stocare","mw":4.2,"applicant":"FLYDEV-7G SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":70,"issue":"19.05.2026","expiry":"2029-05-19","district":"Anenii Noi","name":"Anenii Noi","point":"celula 10 kV din SE Serpeni 110/10 kV","kv":10,"sub":"Serpeni","type":"Solară/Stocare","mw":6.6,"applicant":"ZAVRICICO-PRIM SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":71,"issue":"07.04.2026","expiry":"2028-04-07","district":"Cimislia","name":"Cimișlia","point":"celula 10 kV din SE Gura Galbenei 110/10 kV","kv":10,"sub":"Gura Galbenei","type":"Solară/Stocare","mw":2.3,"applicant":"IGS COMPANY SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":72,"issue":"19.05.2026","expiry":"2029-05-19","district":"Anenii Noi","name":"Anenii Noi","point":"celula 10 kV din SE Protegailovca 110/10 kV","kv":10,"sub":"Protegailovca","type":"Stocare","mw":5,"applicant":"HIDROMEYSTER SRL","solar":false,"wind":false,"storage":true,"thermal":false},{"nr":73,"issue":"20.05.2026","expiry":"2029-05-20","district":"Straseni","name":"Strășeni","point":"celula 10 kV din SE Bucovat 110/10 kV","kv":10,"sub":"Bucovat","type":"Stocare","mw":4,"applicant":"SKC Electronic SRL","solar":false,"wind":false,"storage":true,"thermal":false},{"nr":74,"issue":"21.05.2026","expiry":"2030-05-21","district":"Riscani","name":"Rîșcani","point":"ID-110 kV in SE Balti 330/110/35 kV","kv":110,"sub":"Balti","type":"Stocare","mw":50,"applicant":"OUTSOURCING & CONSULTING GROUP SRL","solar":false,"wind":false,"storage":true,"thermal":false},{"nr":75,"issue":"03.06.2026","expiry":"2026-09-25","district":"Stefan Voda","name":"Ștefan Vodă","point":"LEA 110 kV prin derivatie in LEA 110 kV MGRES - Cioburciu 1","kv":110,"sub":null,"type":"Solară/Eoliană/Stocare","mw":37,"applicant":"GREEN POWER SOLUTIONS","solar":true,"wind":true,"storage":true,"thermal":false},{"nr":76,"issue":"15.07.2026","expiry":"2029-07-15","district":"Hincesti","name":"Hîncești","point":"celula nr.16 din SE Carpineni 110/35/10","kv":null,"sub":"Carpineni","type":"Solară/Stocare","mw":5.94,"applicant":"Fly Ren Infrastructure S.R.L.","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":77,"issue":"24.06.2026","expiry":"2030-06-24","district":"Ungheni","name":"Ungheni","point":"SE proprie, derivatie in LEA 35 kV Ungheni-Valea Mare","kv":35,"sub":null,"type":"Solară/Stocare","mw":15,"applicant":"ZAW ENERGY SRL","solar":true,"wind":false,"storage":true,"thermal":false},{"nr":78,"issue":"06.08.2026","expiry":"2028-08-05","district":"Stefan Voda","name":"Ștefan Vodă","point":"SE proprie, derivatie in LEA 110 kV MGRES - Purcari","kv":110,"sub":null,"type":"Solară/Eoliană/Stocare","mw":40,"applicant":"EW ENERGY WIND SRL","solar":true,"wind":true,"storage":true,"thermal":false}],"districts":{"Briceni":{"name":"Briceni","region":"North","xy":[87.3,49.4],"ll":[48.36,27.08]},"Donduseni":{"name":"Dondușeni","region":"North","xy":[158,77.5],"ll":[48.22,27.61]},"Soroca":{"name":"Soroca","region":"North","xy":[250.2,89.5],"ll":[48.16,28.3]},"Singerei":{"name":"Sîngerei","region":"North","xy":[228.8,193.1],"ll":[47.64,28.14]},"Glodeni":{"name":"Glodeni","region":"North","xy":[146,167.3],"ll":[47.77,27.52]},"Falesti":{"name":"Fălești","region":"North","xy":[171.4,207],"ll":[47.57,27.71]},"Drochia":{"name":"Drochia","region":"North","xy":[184.7,115.5],"ll":[48.03,27.81]},"Riscani":{"name":"Rîșcani","region":"North","xy":[151.4,131.5],"ll":[47.95,27.56]},"Floresti":{"name":"Florești","region":"North","xy":[250.2,143.4],"ll":[47.89,28.3]},"Balti":{"name":"Bălți","region":"North","xy":[200.8,169.3],"ll":[47.76,27.93]},"Orhei":{"name":"Orhei","region":"Centre","xy":[319.6,244.5],"ll":[47.38,28.82]},"Rezina":{"name":"Rezina","region":"Centre","xy":[338.3,171.3],"ll":[47.75,28.96]},"Soldanesti":{"name":"Șoldănești","region":"Centre","xy":[316.9,157.4],"ll":[47.82,28.8]},"Telenesti":{"name":"Telenești","region":"Centre","xy":[259.5,220.8],"ll":[47.5,28.37]},"Straseni":{"name":"Strășeni","region":"Centre","xy":[291.6,291.7],"ll":[47.14,28.61]},"Ialoveni":{"name":"Ialoveni","region":"Centre","xy":[314.2,330.9],"ll":[46.94,28.78]},"Hincesti":{"name":"Hîncești","region":"Centre","xy":[288.9,352.4],"ll":[46.83,28.59]},"Nisporeni":{"name":"Nisporeni","region":"Centre","xy":[234.1,303.5],"ll":[47.08,28.18]},"Ungheni":{"name":"Ungheni","region":"Centre","xy":[183.4,278],"ll":[47.21,27.8]},"Chisinau":{"name":"Chișinău","region":"Centre","xy":[324.9,317.2],"ll":[47.01,28.86]},"Anenii Noi":{"name":"Anenii Noi","region":"Centre","xy":[374.3,342.6],"ll":[46.88,29.23]},"Stefan Voda":{"name":"Ștefan Vodă","region":"South","xy":[431.7,414.6],"ll":[46.51,29.66]},"Causeni":{"name":"Căușeni","region":"South","xy":[398.4,389.4],"ll":[46.64,29.41]},"Cimislia":{"name":"Cimișlia","region":"South","xy":[314.2,412.7],"ll":[46.52,28.78]},"Leova":{"name":"Leova","region":"South","xy":[243.5,420.5],"ll":[46.48,28.25]},"Ceadir-Lunga":{"name":"Ceadîr-Lunga","region":"South","xy":[320.9,501.6],"ll":[46.06,28.83]}},"nodes":[{"id":"chi","name":"Chișinău","kv":"400/330/110","ll":[47,28.9],"xy":[330.3,319.1]},{"id":"bal","name":"Bălți","kv":"330/110","ll":[47.78,27.95],"xy":[203.4,165.3]},{"id":"str","name":"Strășeni","kv":"330","ll":[47.13,28.58],"xy":[287.5,293.7]},{"id":"vul","name":"Vulcănești","kv":"400","ll":[45.68,28.4],"xy":[263.5,574.4]},{"id":"mgr","name":"MGRES","kv":"400/330","ll":[46.62,29.92],"xy":[466.5,393.3]},{"id":"rib","name":"Rîbnița","kv":"330","ll":[47.77,29],"xy":[343.6,167.3]}],"ext":{"isa":[271.5,652.5],"suc":[-23.5,191.1],"gut":[56.6,406.9]},"outline":"M25.4,69.8L25.4,68.1L26.3,64.7L27.8,62.3L32.6,59.6L33.1,57.2L33.6,55.2L36.4,56.2L38.4,58.6L39.8,61.0L41.3,63.0L43.7,64.3L46.5,64.0L48.0,62.7L48.5,59.9L48.5,56.2L47.5,52.5L47.0,49.8L47.0,48.1L48.5,46.0L48.9,46.0L51.3,47.1L52.3,47.1L53.3,45.7L53.7,44.3L54.2,43.0L55.7,42.6L60.0,44.7L64.3,48.4L69.1,51.1L73.9,50.1L75.4,48.8L76.3,49.1L77.3,49.8L78.7,49.4L80.2,49.8L81.1,49.4L80.7,48.4L80.2,47.1L80.2,46.4L80.2,45.0L79.7,43.3L80.2,42.0L81.6,41.3L83.1,42.0L86.0,43.7L99.9,49.1L104.2,49.1L109.5,46.7L110.0,45.7L117.2,36.5L122.0,34.1L124.9,34.8L128.7,38.2L130.7,38.9L132.6,37.9L140.7,31.1L143.6,26.7L149.4,26.7L150.8,26.3L154.2,24L157.1,24.3L157.6,29.7L160.5,31.1L176.8,30.8L181.6,33.1L189.8,39.2L192.2,41.6L194.6,45.7L196.0,48.1L197.5,48.8L200.3,53.5L205.6,55.5L210.4,56.2L217.7,57.2L220.1,58.6L222.5,61.0L223.4,64.7L220.5,72.5L222.5,73.8L225.3,74.2L227.7,73.5L231.6,70.1L234.0,69.8L235.0,72.8L235.4,76.9L236.9,79.2L238.8,79.9L242.2,79.2L245.1,77.6L247.0,75.5L249.4,74.2L255.6,73.5L258.0,73.8L259.0,75.2L259.5,79.2L258.5,83.3L257.1,85.0L255.1,86.3L253.2,88.7L252.3,91.8L252.3,94.5L253.7,96.1L256.6,95.5L259.0,93.1L260.4,90.1L261.9,87.7L265.2,87.4L267.2,88.7L268.6,91.4L268.1,94.5L266.2,97.2L269.6,104.9L271.5,106.6L273.9,108.6L275.3,108.3L275.8,106.6L275.8,103.2L276.8,99.9L276.8,98.8L279.2,91.8L282.5,90.4L286.9,90.4L298.9,95.5L308.0,95.8L312.8,96.5L316.7,99.2L317.6,100.9L318.1,102.2L318.1,103.6L318.6,104.9L320.5,110.0L321.0,115.4L321.0,116.4L322.0,117.7L324.4,119.8L325.3,121.4L327.7,126.2L332.0,130.9L334.9,132.9L336.9,134.6L341.2,136.3L346.0,135.3L351.8,127.5L356.1,125.5L358.5,125.5L359.9,126.2L361.9,127.8L363.3,130.2L364.3,133.6L365.7,140.3L366.7,143.3L368.6,144.7L373.9,146.4L375.3,147.4L374.8,150.0L372.4,152.7L370.0,155.4L368.6,157.8L367.1,161.1L367.1,163.5L368.6,164.5L373.4,166.2L374.8,167.8L375.3,170.2L373.9,172.5L370.0,177.6L369.1,183.9L369.1,191.0L368.1,198.3L364.3,204.3L360.9,209.0L359.4,214.0L360.9,222.0L361.9,224.0L362.3,224.7L364.3,230.7L365.2,232.7L368.1,234.7L369.1,233.4L370.5,231.4L372.9,230.4L374.8,231.4L377.2,235.4L381.1,238.4L382.0,240.4L382.5,242.7L384.0,244.7L385.4,246.0L387.8,246.4L389.7,247.4L391.7,249.7L392.1,253.0L392.1,255.7L392.6,258.7L393.1,259.3L394.5,261.7L396.5,263.3L398.4,264.3L400.3,264.3L402.7,263.7L405.1,261.3L405.6,258.7L406.6,255.7L408.0,252.7L410.4,252.4L413.3,252.7L415.7,253.4L418.1,255.3L419.5,259.0L421.0,263.3L421.0,268.0L419.5,271.3L416.2,273.3L415.7,277.3L417.1,287.6L416.2,292.5L414.2,294.9L411.4,295.8L408.0,296.2L407.5,296.5L407.5,297.2L407.5,297.8L408.0,298.5L411.8,306.1L412.8,307.4L414.2,306.1L415.7,303.8L417.1,301.5L419.5,301.1L421.5,302.5L422.9,304.5L423.9,307.1L423.9,310.1L422.9,312.7L421.5,314.7L420.0,316.7L419.0,324.0L418.6,326.6L418.1,327.3L418.1,329.6L419.5,331.9L420.0,331.9L423.4,331.9L424.8,332.6L426.7,334.9L427.7,335.9L430.1,336.5L434.4,336.8L436.4,337.8L438.8,339.8L441.6,345.1L444.0,346.7L448.4,347.4L452.2,347.1L456.1,347.7L459.9,350.7L460.9,352.0L461.8,355.6L462.3,356.6L463.8,357.0L464.7,356.0L466.2,355.3L467.6,356.3L467.6,357.6L467.6,361.9L468.1,363.5L468.6,364.9L470.0,367.8L470.5,369.1L471.0,372.8L469.5,384.9L469.0,387.2L468.6,388.9L468.1,390.8L468.1,393.5L468.6,395.4L470.0,399.4L470.5,401.3L469.0,405.3L465.7,405.9L463.8,406.3L464.2,410.5L465.7,412.8L471.9,415.4L471.9,415.8L472.9,417.7L473.4,418.0L473.8,417.7L475.8,416.7L476.2,416.7L477.7,417.7L478.2,418.7L480.1,422.3L479.1,423.9L484.9,428.8L487.3,431.5L488.7,430.2L490.7,429.8L493.1,430.5L494.5,431.5L491.6,437.4L487.8,440.9L482.0,441.9L466.2,440.9L464.2,441.6L461.8,442.9L456.5,447.2L454.1,447.5L451.3,444.5L451.3,443.2L451.3,439.6L451.3,438.0L450.3,436.4L447.9,431.8L440.7,425.3L438.8,422.0L438.8,427.5L437.3,430.5L434.9,431.5L431.1,431.5L430.1,432.8L430.6,437.4L429.6,440.6L428.2,442.6L425.8,443.2L423.4,442.9L421.5,441.9L419.5,439.3L417.6,435.1L415.7,433.4L413.8,432.8L409.9,431.8L408.0,431.1L407.0,429.5L406.6,428.2L407.0,426.6L408.0,425.3L408.5,423.9L409.0,422.3L408.5,421.3L408.0,420.0L404.6,419.4L404.6,419.7L401.7,421.0L399.3,423.9L393.6,432.8L392.1,432.8L389.7,429.2L386.4,422.6L384.4,422.0L382.0,425.9L381.6,428.2L382.5,432.1L382.5,434.1L381.6,436.4L380.6,436.7L379.6,436.4L378.2,437.0L373.4,442.3L370.5,444.2L368.1,442.3L368.1,440.3L369.1,438.3L370.0,436.7L371.0,434.7L371.5,432.4L371.0,416.1L370.5,411.8L368.1,409.2L365.2,409.2L353.7,415.8L351.3,416.7L346.5,418.7L336.4,425.3L333.5,429.5L333.0,435.1L334.0,442.3L336.4,451.4L336.4,454.3L335.4,457.6L334.5,460.5L334.9,463.1L336.9,466.1L336.9,466.4L341.7,470.3L345.0,473.6L345.5,477.8L344.1,482.4L341.2,487.6L336.4,492.8L335.4,496.0L335.9,500.6L338.3,509.0L337.8,512.9L334.5,514.5L311.4,520.4L309.0,522.0L307.5,524.9L307.5,528.2L309.0,534.6L309.9,537.9L309.5,541.8L308.5,544.4L307.1,546.0L304.2,547.3L300.3,548.2L299.4,549.2L299.4,550.2L299.8,552.1L299.8,554.1L299.4,555.7L296.0,557.9L286.9,558.6L284.9,562.5L285.4,563.8L285.9,566.0L284.9,567.3L281.1,568.6L278.7,570.2L277.3,571.8L274.4,576.3L273.4,578.6L274.4,579.9L276.8,581.2L278.2,583.1L279.2,585.7L279.2,588.3L280.1,590.8L281.6,593.4L278.2,595.4L277.3,596.0L276.8,597.6L276.8,597.9L276.8,598.3L277.7,604.7L277.3,606.9L274.4,608.2L265.7,607.9L255.6,605.3L246.0,604.7L239.3,610.2L237.8,612.4L236.9,614.7L236.9,616L233.0,611.8L232.1,609.8L232.1,603.4L232.1,602.8L231.6,602.4L231.1,601.5L228.7,597.3L225.8,595.0L218.1,590.8L220.1,588.6L222.5,586.7L224.4,585.0L226.3,584.4L230.6,584.4L232.6,583.4L231.6,580.9L232.1,578.0L230.6,558.9L229.7,557.0L227.3,552.4L225.3,546.6L224.9,541.1L225.3,540.1L227.3,538.8L227.7,537.9L227.3,536.9L226.3,534.6L225.8,533.3L225.8,531.7L226.3,530.1L226.8,528.8L226.3,527.2L225.3,525.9L224.9,524.6L224.9,522.6L221.5,512.9L221.0,510.3L221.5,508.4L222.9,501.6L222.9,500.6L222.0,499.9L222.0,499.0L222.5,498.0L223.4,497.3L224.4,494.7L224.9,493.4L227.3,486.9L227.7,482.4L229.2,477.8L229.2,476.2L228.2,474.9L227.3,473.6L224.9,469.7L224.4,468.0L226.3,467.4L227.7,466.7L228.2,465.8L227.7,462.5L228.2,461.2L229.2,460.5L231.1,459.9L232.1,459.2L234.0,457.6L235.4,453.7L235.9,453.0L235.9,450.7L235.0,446.8L235.4,445.5L236.9,444.9L237.8,443.9L238.3,438.0L239.3,437.4L240.2,436.7L240.7,436.7L241.2,435.7L240.2,432.8L242.2,432.1L243.1,430.5L243.1,428.8L243.1,423.0L242.6,421.3L242.6,421.0L241.7,421.3L241.2,420.7L239.8,417.4L239.3,415.8L239.8,408.5L240.2,406.9L241.2,406.3L240.2,403.0L240.7,400.4L242.2,397.7L243.1,395.8L243.1,393.1L242.6,391.2L242.6,390.2L241.2,384.9L234.0,369.8L234.0,366.2L228.2,357.0L226.3,351.4L226.3,350.0L226.8,347.7L226.8,346.1L225.3,344.1L225.3,341.8L225.3,339.8L222.9,338.2L223.9,335.2L223.9,334.9L223.9,331.9L221.0,324.6L219.1,321.3L215.2,316.0L214.8,315.7L213.8,312.7L211.4,314.1L208.0,312.7L205.2,310.7L201.8,310.1L201.8,307.1L200.3,305.8L196.5,303.1L192.2,298.5L191.2,297.8L189.8,297.2L189.3,296.8L189.8,295.2L189.8,293.9L184.0,290.9L182.6,288.6L184.0,288.2L184.5,287.2L184.0,285.9L183.5,284.6L183.5,284.2L181.6,278.9L178.2,274.6L176.8,272.3L177.3,269.6L174.4,265.0L173,263.3L169.6,262.7L168.6,262.0L167.7,261.0L166.2,260.3L162.9,259.3L161.4,259.0L160.0,256.0L156.6,248.4L155.2,247.0L154.7,246.7L152.8,245.4L154.2,239.4L151.8,237.4L152.3,235.0L152.8,233.0L153.2,231.4L154.2,230.4L153.2,228.7L151.8,227.0L149.9,225.7L148.0,225.0L147.5,225.4L144.1,225.0L143.6,224.7L143.2,224.4L142.2,223.7L141.2,223.7L139.8,222.4L138.8,219.4L137.9,214.0L137.4,214.0L135.9,213.7L135.5,213.4L135.5,212.7L135.5,210.7L135.0,210.0L134.5,209.0L134.0,206.3L134.0,205.3L133.5,204.7L129.7,203.0L125.8,199.3L117.2,187.9L114.3,182.6L112.9,178.2L115.8,177.6L115.8,176.2L115.3,174.9L115.3,172.9L114.8,171.2L114.8,170.9L114.3,170.2L111.9,168.2L111.4,167.5L110.9,165.8L109.0,162.8L107.6,159.8L105.7,158.4L110.5,155.8L109.5,154.1L108.1,153.4L106.1,152.7L104.7,151.7L105.2,150.4L104.7,144.3L104.7,143.3L102.3,140.6L99.4,139.0L98.0,136.9L100.4,133.9L100.4,132.9L100.4,132.6L99.4,132.2L96.5,129.9L98.4,128.5L99.4,126.8L98.9,124.8L97.5,123.1L95.6,124.1L94.6,121.4L92.7,118.8L89.3,120.4L88.8,119.8L88.8,119.1L88.4,118.4L88.4,117.4L91.2,116.4L91.2,114.7L87.9,112.7L84.5,110.0L82.1,105.9L81.1,101.2L81.6,99.9L83.1,98.2L83.1,97.2L82.1,96.1L81.1,95.1L79.7,94.5L78.3,95.8L75.9,95.1L72.0,92.8L72.0,91.4L74.9,91.4L76.3,89.7L76.3,88.0L71.5,86.3L70.6,84.3L70.1,82.0L68.2,80.6L67.2,81.6L65.8,84.0L64.3,84.7L63.8,81.3L62.9,79.6L57.1,73.8L55.7,74.8L52.8,70.8L50.4,69.8L45.1,70.8L42.2,70.4L40.8,67.4L39.3,69.4L37.9,69.1L35.0,66.4L32.1,66.7Z","W":520,"H":640};
+const $ = s => document.querySelector(s);
+const fmt = (n,d=0) => n.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d});
+const TODAY = '2026-11-12';
+const SVGNS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs={}, parent) => { const e=document.createElementNS(SVGNS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; };
+
+/* ---- price shape bars ---- */
+function shape(id, bands){
+  const s=$(id), x0=90, x1=350, max=220, X=v=>x0+(v/max)*(x1-x0);
+  [0,50,100,150,200].forEach(v=>{ el('line',{x1:X(v),x2:X(v),y1:14,y2:134,stroke:'var(--line)','stroke-width':1},s);
+    const t=el('text',{x:X(v),y:152,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},s); t.textContent=v; });
+  const t=el('text',{x:x1,y:167,'text-anchor':'end','font-size':10.5,fill:'var(--muted)'},s); t.textContent='€/MWh';
+  bands.forEach((b,i)=>{ const y=30+i*52;
+    const l=el('text',{x:0,y:y+15,'font-size':12.5,fill:'var(--ink)'},s); l.textContent=b.label;
+    el('rect',{x:X(b.lo),y:y,width:Math.max(4,X(b.hi)-X(b.lo)),height:22,rx:3,fill:b.color},s);
+    const v=el('text',{x:X(b.hi)+6,y:y+15,'font-size':11.5,fill:'var(--muted)','font-family':'IBM Plex Mono, monospace'},s); v.textContent=b.lo===b.hi?`~${b.lo}`:`${b.lo}–${b.hi}`;
+  });
+}
+shape('#shapeSummer',[{label:'Midday',lo:0,hi:25,color:'var(--solar)'},{label:'Peak',lo:100,hi:200,color:'var(--accent)'}]);
+shape('#shapeWinter',[{label:'Off-peak',lo:99,hi:101,color:'var(--muted)'},{label:'Peak',lo:150,hi:200,color:'var(--accent)'}]);
+
+/* ---- district features ---- */
+const R = 6371, rad = d => d*Math.PI/180;
+const hav = (a,b) => { const dLa=rad(b[0]-a[0]), dLo=rad(b[1]-a[1]); const h=Math.sin(dLa/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+const rightBank = DATA.nodes.filter(n=>!['mgr','rib'].includes(n.id));
+const dist = {};
+DATA.rows.forEach(r=>{
+  const d = dist[r.district] ??= {key:r.district, ...DATA.districts[r.district], rows:[], mw:0, solar:0, wind:0, storageMW:0, thermal:0, vreNoStore:0, vre:0};
+  r.lb = /MGRES|CERS Moldoveneasca|Bender|Ribnita/.test(r.point);
+  d.rows.push(r); d.mw += r.mw; d.lbMW = (d.lbMW||0) + (r.lb ? r.mw : 0);
+  const kinds = [r.solar&&'solar', r.wind&&'wind', r.thermal&&'thermal'].filter(Boolean);
+  const share = kinds.length ? r.mw/kinds.length : 0;   // mixed permits split evenly across their generation types, for the mix bar only
+  kinds.forEach(k=>d[k]+=share);
+  if(!kinds.length && r.storage) d.storageMW += r.mw;  // pure storage permits
+  if(r.storage && kinds.length) d.storageMW += 0;      // co-located storage size is not stated in the register
+  if(r.solar||r.wind){ d.vre += r.mw; if(!r.storage) d.vreNoStore += r.mw; }
+});
+const D = Object.values(dist);
+D.forEach(d=>{ let best=null; rightBank.forEach(n=>{ const k=hav(d.ll,n.ll); if(!best||k<best.km) best={km:k,node:n}; }); d.nearest=best; d.coLocated=d.rows.filter(r=>r.storage&&(r.solar||r.wind)).length; d.expired=d.rows.filter(r=>r.expiry<TODAY).length; });
+const pct = (arr, v, inverse=false) => { // percentile rank 0..1, ties averaged
+  const below=arr.filter(x=>inverse? x>v : x<v).length, eq=arr.filter(x=>x===v).length; return (below+ (eq-1)/2)/(arr.length-1); };
+function score(){
+  const w=[+$('#w1').value,+$('#w2').value,+$('#w3').value], sw=w.reduce((a,b)=>a+b,0)||1;
+  const mws=D.map(d=>d.mw), gaps=D.map(d=>d.vreNoStore), kms=D.map(d=>d.nearest.km);
+  D.forEach(d=>{ d.p=[pct(mws,d.mw), pct(gaps,d.vreNoStore), pct(kms,d.nearest.km,true)]; d.score=100*(d.p[0]*w[0]+d.p[1]*w[1]+d.p[2]*w[2])/sw; d.fits=fits(d); });
+  D.sort((a,b)=>b.score-a.score||b.mw-a.mw);
+}
+/* Opportunity rules, applied in order; a district can match several */
+function fits(d){
+  const f=[];
+  if(d.vre>=20 && d.vreNoStore>=10) f.push({c:'bess',t:'BESS beside renewables',why:`${fmt(d.vreNoStore,1)} MW of solar/wind permits here have no storage attached, so a co-located battery could absorb midday or windy-hour surplus.`});
+  if(d.nearest.km<=15) f.push({c:'node',t:'Grid-scale BESS',why:`The seat is ${fmt(d.nearest.km,0)} km from the ${d.nearest.node.name} ${d.nearest.node.kv} kV node, a strong point for a balancing battery (aFRR/mFRR) and peak shaving.`});
+  if(d.solar>=10) f.push({c:'load',t:'Daytime flexible load',why:`${fmt(d.solar,1)} MW of solar is queued. Load that can shift into 10:00–17:00 would buy at the low midday prices.`});
+  if(!f.length) f.push({c:'watch',t:'Watch',why:'Too little is queued here to point to a clear asset. Keep it on the watch list.'});
+  return f;
+}
+/* ---- ramp ---- */
+const rampVar = s => s>=75?'var(--ramp3)':s>=50?'var(--ramp2)':s>=25?'var(--ramp1)':'var(--ramp0)';
+
+/* ---- map ---- */
+const map=$('#map'); map.setAttribute('viewBox','-50 0 600 690');
+el('path',{d:DATA.outline,fill:'var(--accent-soft)',stroke:'var(--muted)','stroke-width':1.1,'stroke-linejoin':'round'},map);
+const N = Object.fromEntries(DATA.nodes.map(n=>[n.id,n.xy]));
+const link=(a,b,dash,label,anchor)=>{ el('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'var(--accent)','stroke-width':3,'stroke-dasharray':dash?'7 6':'none','stroke-linecap':'round',opacity:.9},map);
+  if(label){ const t=el('text',{x:b[0]+(anchor==='below'?-4:6),y:b[1]+(anchor==='below'?18:4),'font-size':12,'text-anchor':'start',fill:'var(--muted)'},map); t.textContent=label; el('circle',{cx:b[0],cy:b[1],r:3.5,fill:'var(--accent)'},map);} };
+link(N.vul,DATA.ext.isa,false,'Isaccea (RO)');
+link(N.vul,N.chi,false);
+link(N.bal,DATA.ext.suc,true,'Suceava (RO) 2027','below');
+link(N.str,DATA.ext.gut,true,'Gutinaș (RO) 2029','below');
+DATA.nodes.forEach(n=>{ const g=el('g',{},map); const left=['mgr','rib'].includes(n.id);
+  el('rect',{x:n.xy[0]-5,y:n.xy[1]-5,width:10,height:10,transform:`rotate(45 ${n.xy[0]} ${n.xy[1]})`,fill:left?'var(--muted)':'var(--ink)'},g);
+  const t=el('text',{x:n.xy[0]+9,y:n.xy[1]-7,'font-size':11.5,'font-weight':600,fill:left?'var(--muted)':'var(--ink)'},g); t.textContent=n.name; });
+const dotLayer=el('g',{},map), labelLayer=el('g',{'pointer-events':'none'},map);
+let selected=null;
+function drawMap(){
+  dotLayer.innerHTML=''; labelLayer.innerHTML='';
+  [...D].sort((a,b)=>b.mw-a.mw).forEach(d=>{
+    const r=4+Math.sqrt(d.mw)*1.7;
+    const c=el('circle',{cx:d.xy[0],cy:d.xy[1],r,fill:rampVar(d.score),'fill-opacity':.88,stroke:d.key===selected?'var(--ink)':'var(--panel)','stroke-width':d.key===selected?3:1.5,class:'district-dot',tabindex:0,role:'button','aria-label':`${d.name}: score ${Math.round(d.score)}, ${fmt(d.mw,1)} MW permitted`},dotLayer);
+    const tt=el('title',{},c); tt.textContent=`${d.name} · ${fmt(d.mw,1)} MW · score ${Math.round(d.score)}`;
+    c.addEventListener('click',()=>select(d.key)); c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(d.key);}});
+    if((d.mw>=40&&!['Balti','Straseni','Chisinau'].includes(d.key))||d.key===selected){ const t=el('text',{x:d.xy[0],y:d.xy[1]+r+13,'text-anchor':'middle','font-size':12,'font-weight':600,fill:'var(--ink)',stroke:'var(--panel)','stroke-width':3,'paint-order':'stroke'},labelLayer); t.textContent=d.name; }
+  });
+}
+/* ---- ranking table ---- */
+function mixBar(d){ const tot=d.solar+d.wind+d.thermal+d.storageMW||1;
+  return `<span class="mix" title="solar ${fmt(d.solar,1)} · wind ${fmt(d.wind,1)} · storage-only ${fmt(d.storageMW,1)} · thermal ${fmt(d.thermal,1)} MW">${[['solar','--solar'],['wind','--wind'],['storageMW','--storage'],['thermal','--thermal']].map(([k,c])=>`<i style="width:${100*d[k]/tot}%;background:var(${c})"></i>`).join('')}</span>`; }
+function drawRank(){
+  $('#rankBody').innerHTML = D.filter(d=>!southOnly||d.region==='South').map(d=>`<tr tabindex="0" data-k="${d.key}" class="${d.key===selected?'sel':''}">
+    <td>${d.name}<div class="label-note">${d.region}</div></td>
+    <td><span class="scorebar"><i style="width:${Math.max(2,d.score*0.6)}px"></i><span class="num">${Math.round(d.score)}</span></span></td>
+    <td class="r num">${fmt(d.mw,1)}</td><td>${mixBar(d)}</td>
+    <td><span class="fit ${d.fits[0].c}">${d.fits[0].t}</span>${d.fits.length>1?` <span class="label-note">+${d.fits.length-1}</span>`:''}</td></tr>`).join('');
+  document.querySelectorAll('#rankBody tr').forEach(tr=>{ tr.addEventListener('click',()=>select(tr.dataset.k)); tr.addEventListener('keydown',e=>{if(e.key==='Enter'){select(tr.dataset.k);}}); });
+}
+/* ---- detail ---- */
+const tags = r => `${r.solar?'<span class="tag s">solar</span>':''}${r.wind?'<span class="tag w">wind</span>':''}${r.storage?'<span class="tag b">storage</span>':''}${r.thermal?'<span class="tag t">'+(r.type.startsWith('Motoare')?'gas engines':'CHP')+'</span>':''}${r.lb?'<span class="tag lb" title="Connection point names a substation in the Transnistrian region">via MGRES/Bender</span>':''}`;
+function drawDetail(){
+  const d=D.find(x=>x.key===selected); const rank=D.indexOf(d)+1;
+  const pv = p => `${Math.round(p*100)}th pct`;
+  $('#detail').innerHTML = `
+  <div class="dhead"><div><span class="eyebrow">District card · ${d.region} · rank ${rank} of ${D.length}</span><h2>${d.name}</h2></div>
+    <div class="result"><span class="big">${Math.round(d.score)}<small> / 100</small></span></div></div>
+  <div class="feats">
+    <div class="feat"><span class="label-note">Permitted MW queued</span><span class="v">${fmt(d.mw,1)} MW</span><span class="p">${d.rows.length} permit${d.rows.length>1?'s':''} · ${pv(d.p[0])}</span></div>
+    <div class="feat"><span class="label-note">Solar/wind MW without storage</span><span class="v">${fmt(d.vreNoStore,1)} MW</span><span class="p">of ${fmt(d.vre,1)} MW solar/wind · ${pv(d.p[1])}</span></div>
+    <div class="feat"><span class="label-note">Nearest 330/400 kV node</span><span class="v">${fmt(d.nearest.km,0)} km</span><span class="p">${d.nearest.node.name} · ${pv(d.p[2])}</span></div>
+    <div class="feat"><span class="label-note">Through MGRES or Bender lines</span><span class="v">${fmt(d.lbMW||0,1)} MW</span><span class="p">${d.mw?Math.round(100*(d.lbMW||0)/d.mw):0}% of permitted MW</span></div>
+    <div class="feat"><span class="label-note">Storage in the queue</span><span class="v">${fmt(d.storageMW,1)} MW</span><span class="p">standalone, plus ${d.coLocated} co-located permit${d.coLocated===1?'':'s'} of unstated size</span></div>
+  </div>
+  ${d.fits.map(f=>`<div class="why"><span class="fit ${f.c}">${f.t}</span> ${f.why}</div>`).join('')}
+  ${d.expired?`<p class="label-note"><span class="exp">${d.expired} permit${d.expired>1?'s':''} past expiry</span> on today's date. They are still counted, because the register predates their expiry and may since have been extended.</p>`:''}
+  <div class="tablewrap"><table class="permits"><thead><tr><th>#</th><th>Connection point</th><th>Type</th><th class="r">MW</th><th>Holder</th><th>Valid to</th></tr></thead><tbody>
+  ${[...d.rows].sort((a,b)=>b.mw-a.mw).map(r=>`<tr><td class="num">${r.nr}</td><td>${r.point}</td><td>${tags(r)}</td><td class="r num">${fmt(r.mw,1)}</td><td>${r.applicant}</td><td class="num ${r.expiry<TODAY?'exp':''}">${r.expiry}</td></tr>`).join('')}
+  </tbody></table></div>
+  <p class="label-note">Source: <a href="#src-reg">Moldelectrica permit register, 14 Aug 2026</a>. Permits are as filed; MW is the permitted connection capacity.</p>`;
+}
+let southOnly=false;
+function setFilter(s){ southOnly=s; $('#fAll').setAttribute('aria-pressed',String(!s)); $('#fSouth').setAttribute('aria-pressed',String(s)); if(s && D.find(d=>d.key===selected)?.region!=='South'){ selected=D.find(d=>d.region==='South').key; drawMap(); drawDetail(); } drawRank(); }
+function select(k){ selected=k; drawMap(); drawRank(); drawDetail(); }
+function refresh(){ ['1','2','3'].forEach(i=>$('#o'+i).textContent=$('#w'+i).value); score(); if(!selected) selected=D[0].key; drawMap(); drawRank(); drawDetail(); }
+['#w1','#w2','#w3'].forEach(s=>$(s).addEventListener('input',refresh));
+$('#fAll').addEventListener('click',()=>setFilter(false)); $('#fSouth').addEventListener('click',()=>setFilter(true));
+refresh();
+
+/* ---- calculator ---- */
+const ids=['dur','rte','sLoLo','sHiLo','sLoHi','sHiHi','wLoLo','wHiLo','wLoHi','wHiHi','capex','opex'];
+const DAYS={s:182,w:183};
+function margin(E,rte,pc,pd){ return E*pd - (E/rte)*pc; }   // one cycle: deliver E MWh, buy E/rte
+function calc(){
+  const v=Object.fromEntries(ids.map(i=>[i,parseFloat($('#'+i).value)]));
+  const E=v.dur, rte=Math.min(1,Math.max(0.5,(v.rte||85)/100));
+  const seas = (lo,hi,days) => Math.max(0,margin(E,rte,lo,hi))*days;  // battery stays idle on days the spread does not cover losses
+  const low = seas(v.sLoLo,v.sHiLo,DAYS.s)+seas(v.wLoLo,v.wHiLo,DAYS.w);
+  const high= seas(v.sLoHi,v.sHiHi,DAYS.s)+seas(v.wLoHi,v.wHiHi,DAYS.w);
+  const lo=Math.min(low,high), hi=Math.max(low,high), scale=Math.max(hi*1.15,1);
+  const opex=isFinite(v.opex)?v.opex:0;
+  let pay='';
+  if(isFinite(v.capex)&&v.capex>0){ const pb=x=> x-opex>0 ? v.capex/(x-opex) : Infinity;
+    const a=pb(hi), b=pb(lo); pay=`<tr><td>Simple payback</td><td class="r">${isFinite(a)?fmt(a,1):'never'} – ${isFinite(b)?fmt(b,1):'never'} yrs</td></tr>`; }
+  $('#result').innerHTML=`<span class="eyebrow">Arbitrage revenue, €/MW/year · ${E} h battery</span>
+    <span class="big">€${fmt(lo/1000,0)}k – €${fmt(hi/1000,0)}k</span>
+    <div class="rangebar" aria-hidden="true"><div class="track"></div><div class="fill" style="left:${100*lo/scale}%;width:${Math.max(1,100*(hi-lo)/scale)}%"></div></div>
+    <table class="brk">
+      <tr><td>Spring/summer, low → high</td><td class="r">€${fmt(seas(v.sLoLo,v.sHiLo,DAYS.s)/1000,1)}k → €${fmt(seas(v.sLoHi,v.sHiHi,DAYS.s)/1000,1)}k</td></tr>
+      <tr><td>Autumn/winter, low → high</td><td class="r">€${fmt(seas(v.wLoLo,v.wHiLo,DAYS.w)/1000,1)}k → €${fmt(seas(v.wLoHi,v.wHiHi,DAYS.w)/1000,1)}k</td></tr>
+      <tr><td>Energy delivered per year</td><td class="r">${fmt(E*365,0)} MWh/MW</td></tr>
+      ${pay}
+    </table>
+    <p class="label-note">One cycle per day; each cycle buys ${E}/${(rte).toFixed(2)} MWh and sells ${E} MWh. Spring/summer is dominated by the solar midday trough; in winter, losses at about 100 €/MWh off-peak eat much of the spread. Moldova is tendering 246 MW of balancing capacity (72 MW aFRR, 174 MW mFRR) that storage can bid into, and that revenue would come on top (<a href="https://www.ess-news.com/2025/04/10/moldova-to-tender-246-mw-of-colocated-battery-storage/" target="_blank" rel="noopener">ESS News</a>).</p>`;
+}
+ids.forEach(i=>$('#'+i).addEventListener('input',calc)); calc();
+</script>
